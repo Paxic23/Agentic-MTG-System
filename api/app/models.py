@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +54,12 @@ class DeckCard(Base):
     deck_id: Mapped[int] = mapped_column(ForeignKey("decks.id"), index=True)
     card_id: Mapped[int] = mapped_column(ForeignKey("cards.id"), index=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
+
+    is_commander: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+    )
 
     deck: Mapped[Deck] = relationship(back_populates="cards")
     card: Mapped[Card] = relationship(back_populates="deck_entries")
