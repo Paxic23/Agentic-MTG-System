@@ -11,6 +11,16 @@ services:
     volumes:
       - mtg_pgdata:/var/lib/postgresql/data
 
+
+  qdrant:
+      image: qdrant/qdrant:latest
+      container_name: mtg_qdrant
+      ports:
+        - "6333:6333"
+        - "6334:6334"
+      volumes:
+        - qdrant_storage:/qdrant/storage
+
   api:
     build: ./api
     container_name: mtg_api
@@ -22,8 +32,10 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://mtg:mtg@db:5432/mtgdecklab
+      QDRANT_URL: http://qdrant:6333
     depends_on:
       - db
+      - qdrant
 
   frontend:
     build: ./frontend
@@ -41,3 +53,4 @@ services:
 
 volumes:
   mtg_pgdata:
+  qdrant_storage:
