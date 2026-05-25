@@ -7,9 +7,39 @@ type AIHelperPageProps = {
 };
 
 export function AIHelperPage({ lab }: AIHelperPageProps) {
+  const helperIgnoreOptions = Array.from(
+    new Set([
+      "ramp",
+      "card draw",
+      "interaction",
+      "board wipes",
+      "mana base",
+      "mana curve",
+      "deck size",
+      "commander",
+      ...(lab.deckDiagnosis?.findings.map((finding) => finding.category) ?? []),
+    ]),
+  ).sort((left, right) => left.localeCompare(right));
+
+  function toggleIgnoredCategory(category: string) {
+    const normalized = category.trim().toLowerCase();
+    if (!normalized) {
+      return;
+    }
+
+    if (lab.coachIgnoredCategories.includes(normalized)) {
+      lab.setCoachIgnoredCategories(
+        lab.coachIgnoredCategories.filter((current) => current !== normalized),
+      );
+      return;
+    }
+
+    lab.setCoachIgnoredCategories([...lab.coachIgnoredCategories, normalized]);
+  }
+
   return (
     <div className="stack">
-      <SectionCard title="AI Helper" subtitle="Open-ended deck coaching and recommendations">
+      <SectionCard title="Semantic Helper" subtitle="Open-ended deck coaching and recommendations">
         {!lab.selectedDeck && (
           <p className="muted">Select or create a deck first, then ask for coaching help.</p>
         )}
@@ -33,8 +63,32 @@ export function AIHelperPage({ lab }: AIHelperPageProps) {
           />
         </label>
 
+        <div className="field">
+          <span>Ignore status categories (optional)</span>
+          <p className="muted helper-note">
+            Suppress repeated coaching advice for categories you do not want to optimize right now.
+          </p>
+          <div className="ignore-chip-grid">
+            {helperIgnoreOptions.map((category) => {
+              const normalized = category.trim().toLowerCase();
+              const isActive = lab.coachIgnoredCategories.includes(normalized);
+
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  className={`ignore-chip ${isActive ? "active" : ""}`}
+                  onClick={() => toggleIgnoredCategory(category)}
+                >
+                  {category}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <button className="primary-button" onClick={lab.runDeckCoach} disabled={lab.coachLoading} type="button">
-          {lab.coachLoading ? "Thinking..." : "Ask AI helper"}
+          {lab.coachLoading ? "Thinking..." : "Ask semantic helper"}
         </button>
 
         {lab.coachGoalUsed && (

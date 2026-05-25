@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 
 
 @dataclass(frozen=True)
@@ -78,15 +78,29 @@ class OpenAICompatibleLLMClient:
         temperature: float,
         max_output_tokens: int,
     ) -> LLMCompletion:
-        response = self._client.chat.completions.create(
-            model=self.model,
-            messages=[
+        request_kwargs = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=temperature,
-            max_tokens=max_output_tokens,
-        )
+            "temperature": temperature,
+        }
+
+        try:
+            response = self._client.chat.completions.create(
+                **request_kwargs,
+                max_tokens=max_output_tokens,
+            )
+        except BadRequestError as exc:
+            message = str(exc).lower()
+            if "max_completion_tokens" not in message or "max_tokens" not in message:
+                raise
+
+            response = self._client.chat.completions.create(
+                **request_kwargs,
+                max_completion_tokens=max_output_tokens,
+            )
 
         message = response.choices[0].message
         text = (message.content or "").strip()

@@ -71,6 +71,7 @@ def run_report_tool(
     diagnosis: dict[str, Any],
     suggestions_response: dict[str, Any],
     user_goal: str | None,
+    ignored_categories: list[str],
 ) -> str:
     return build_deck_coach_report(
         deck=deck,
@@ -79,6 +80,7 @@ def run_report_tool(
         diagnosis=diagnosis,
         suggestions_response=suggestions_response,
         user_goal=user_goal,
+        ignored_categories=ignored_categories,
     )
 
 
@@ -90,6 +92,7 @@ def run_llm_report_enhancement_tool(
     diagnosis: dict[str, Any],
     suggestions_response: dict[str, Any],
     goal_used: str | None,
+    ignored_categories: list[str],
     deterministic_report: str,
 ) -> dict[str, Any]:
     """Optionally enhance the deterministic report with a configured LLM.
@@ -131,6 +134,7 @@ def run_llm_report_enhancement_tool(
             rules_check=rules_check,
             diagnosis=diagnosis,
             suggestions_response=suggestions_response,
+            ignored_categories=ignored_categories,
             deterministic_report=deterministic_report,
         )
 

@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class SemanticSearchRequest(BaseModel):
@@ -37,3 +39,30 @@ class DeckCoachRequest(BaseModel):
     suggestion_limit: int = 5
     max_mana_value: float | None = None
     include_tool_payloads: bool = True
+    ignore_categories: list[str] = Field(default_factory=list)
+
+
+class CardPriceSearchRequest(BaseModel):
+    names: list[str] = Field(default_factory=list)
+    ids: list[int] = Field(default_factory=list)
+
+
+class CardPriceRefreshRequest(BaseModel):
+    force: bool = False
+
+
+class GeneralChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class GeneralChatRequest(BaseModel):
+    messages: list[GeneralChatMessage] = Field(default_factory=list)
+    include_deck_context: bool = False
+    deck_ids: list[int] = Field(default_factory=list)
+
+
+class GeneralChatResponse(BaseModel):
+    reply: str
+    used_deck_context: bool = False
+    referenced_deck_count: int = 0

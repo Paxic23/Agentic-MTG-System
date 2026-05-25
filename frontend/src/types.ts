@@ -119,3 +119,14 @@ export type DeckDiagnosis = {
   color_counts: Record<string, number>;
   findings: DiagnosisFinding[];
 };
+
+export type GeneralChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type GeneralChatResponse = {
+  reply: string;
+  used_deck_context: boolean;
+  referenced_deck_count: number;
+};

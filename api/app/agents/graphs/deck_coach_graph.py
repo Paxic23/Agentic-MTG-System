@@ -32,6 +32,7 @@ class DeckCoachState(TypedDict, total=False):
     rules_check: dict[str, Any]
     diagnosis: dict[str, Any]
     goal_used: str | None
+    ignored_categories: list[str]
     suggestions_response: dict[str, Any]
     coach_report: str
     llm: dict[str, Any]
@@ -109,9 +110,15 @@ def diagnose_deck_node(state: DeckCoachState) -> dict[str, Any]:
 
 def choose_goal_node(state: DeckCoachState) -> dict[str, Any]:
     request = state["request"]
+    ignored_categories = [
+        category.strip().lower()
+        for category in request.ignore_categories
+        if category and category.strip()
+    ]
 
     return {
-        "goal_used": resolve_coach_goal(request.goal)
+        "goal_used": resolve_coach_goal(request.goal),
+        "ignored_categories": ignored_categories,
     }
 
 
@@ -141,6 +148,7 @@ def build_report_node(state: DeckCoachState) -> dict[str, Any]:
             diagnosis=state["diagnosis"],
             suggestions_response=state["suggestions_response"],
             user_goal=request.goal,
+            ignored_categories=state.get("ignored_categories", []),
         )
     }
 
@@ -153,6 +161,7 @@ def enhance_report_with_llm_node(state: DeckCoachState) -> dict[str, Any]:
         diagnosis=state["diagnosis"],
         suggestions_response=state["suggestions_response"],
         goal_used=state.get("goal_used"),
+        ignored_categories=state.get("ignored_categories", []),
         deterministic_report=state["coach_report"],
     )
 

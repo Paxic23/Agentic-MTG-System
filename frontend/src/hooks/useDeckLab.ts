@@ -69,6 +69,7 @@ export function useDeckLab() {
 
   const [coachGoal, setCoachGoal] = useState("");
   const [coachMaxManaValue, setCoachMaxManaValue] = useState("");
+  const [coachIgnoredCategories, setCoachIgnoredCategories] = useState<string[]>([]);
   const [coachReport, setCoachReport] = useState("");
   const [coachGoalUsed, setCoachGoalUsed] = useState("");
   const [coachSuggestions, setCoachSuggestions] = useState<DeckSuggestion[]>([]);
@@ -469,6 +470,7 @@ export function useDeckLab() {
         deckId: selectedDeckId,
         goal: coachGoal,
         maxManaValue: coachMaxManaValue,
+        ignoreCategories: coachIgnoredCategories,
         suggestionLimit: 5,
         includeToolPayloads: true,
       });
@@ -539,6 +541,8 @@ export function useDeckLab() {
       setCoachGoal,
       coachMaxManaValue,
       setCoachMaxManaValue,
+      coachIgnoredCategories,
+      setCoachIgnoredCategories,
       coachReport,
       coachGoalUsed,
       coachSuggestions,
@@ -590,6 +594,7 @@ export function useDeckLab() {
       selectedDeckTotalCards,
       coachGoal,
       coachMaxManaValue,
+      coachIgnoredCategories,
       coachReport,
       coachGoalUsed,
       coachSuggestions,

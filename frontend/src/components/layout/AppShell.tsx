@@ -48,7 +48,8 @@ export function AppShell({ lab }: AppShellProps) {
         <NavLink to="/search" className={({ isActive }) => (isActive ? "active" : "")}>Search</NavLink>
         <NavLink to="/builder" className={({ isActive }) => (isActive ? "active" : "")}>Builder</NavLink>
         <NavLink to="/insights" className={({ isActive }) => (isActive ? "active" : "")}>Insights</NavLink>
-        <NavLink to="/ai-helper" className={({ isActive }) => (isActive ? "active" : "")}>AI Helper</NavLink>
+        <NavLink to="/ai-helper" className={({ isActive }) => (isActive ? "active" : "")}>Semantic Helper</NavLink>
+        <NavLink to="/chat" className={({ isActive }) => (isActive ? "active" : "")}>General Chat</NavLink>
       </nav>
 
       {lab.error && (

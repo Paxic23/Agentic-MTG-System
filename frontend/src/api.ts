@@ -8,6 +8,8 @@ import type {
   DeckExportResult,
   DeckImportResult,
   DeckSuggestionResponse,
+  GeneralChatMessage,
+  GeneralChatResponse,
   RulesCheck,
 } from "./types";
 
@@ -203,6 +205,7 @@ export async function runDeckCoach(payload: {
   deckId: string;
   goal: string;
   maxManaValue?: string;
+  ignoreCategories?: string[];
   suggestionLimit?: number;
   includeToolPayloads?: boolean;
 }): Promise<DeckCoachResponse> {
@@ -216,9 +219,30 @@ export async function runDeckCoach(payload: {
       goal: payload.goal.trim() || null,
       suggestion_limit: payload.suggestionLimit ?? 5,
       max_mana_value: payload.maxManaValue ? Number(payload.maxManaValue) : null,
+      ignore_categories: payload.ignoreCategories ?? [],
       include_tool_payloads: payload.includeToolPayloads ?? true,
     }),
   });
 
   return readResponse<DeckCoachResponse>(response, "Could not run deck coach");
+}
+
+export async function runGeneralChat(payload: {
+  messages: GeneralChatMessage[];
+  includeDeckContext?: boolean;
+  deckIds?: number[];
+}): Promise<GeneralChatResponse> {
+  const response = await fetch(`${API_URL}/agent/general-chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: payload.messages,
+      include_deck_context: payload.includeDeckContext ?? false,
+      deck_ids: payload.deckIds ?? [],
+    }),
+  });
+
+  return readResponse<GeneralChatResponse>(response, "Could not run general chat");
 }

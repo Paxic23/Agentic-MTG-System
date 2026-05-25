@@ -420,6 +420,77 @@ textarea {
   flex-wrap: wrap;
 }
 
+.helper-note {
+  margin: 0;
+}
+
+.ignore-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ignore-chip {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-solid) 78%, var(--accent) 8%);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.86rem;
+}
+
+.ignore-chip.active {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel-solid));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.chat-context-controls {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.chat-context-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chat-thread {
+  max-height: 440px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.55rem;
+  padding-right: 0.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.chat-message {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel-solid) 90%, transparent);
+  padding: 0.65rem 0.75rem;
+}
+
+.chat-message header {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.28rem;
+}
+
+.chat-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.chat-message-user {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
 .chip-row button {
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel-solid) 78%, var(--accent) 8%);

@@ -15,13 +15,16 @@ def build_deck_coach_prompts(
     rules_check: dict[str, Any],
     diagnosis: dict[str, Any],
     suggestions_response: dict[str, Any],
+    ignored_categories: list[str],
     deterministic_report: str,
 ) -> tuple[str, str]:
     system_prompt = (
         "You are an expert Magic: The Gathering deck coach. "
         "Give practical, format-aware advice in a natural, flexible tone. "
         "Never invent card data not present in the supplied tool outputs. "
-        "Prefer clear reasoning, realistic caveats, and concrete next steps."
+        "Prefer clear reasoning, realistic caveats, and concrete next steps. "
+        "Do not overstate deck themes: if diagnosis.theme_profile marks a role as minor, "
+        "treat it as incidental support, not as a central deck identity."
     )
 
     user_prompt = f"""
@@ -30,11 +33,16 @@ Create a fresh coaching response for this deck.
 Deck name: {deck_name}
 Format: {deck_format or "unknown"}
 Goal used: {goal_used or "none"}
+Ignored categories: {", ".join(ignored_categories) if ignored_categories else "none"}
 
 Rules:
 - If there are legality or rules issues, surface them early.
+- Use diagnosis.theme_profile when discussing themes.
+- Only describe core/supporting roles as real deck themes.
+- Minor themes can be mentioned only as small incidental packages, not as deck identity.
 - The response can use headings and lists if useful, but do not force a rigid template.
 - Keep the response concise but substantive.
+- Do not repeatedly push categories listed in "Ignored categories" unless they are direct hard legality issues.
 - Use only the suggested cards supplied in the tool output.
 - Do not claim prices or current market info unless explicitly provided.
 - If no explicit goal is provided, do an open-ended deck improvement pass.

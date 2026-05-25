@@ -1,5 +1,7 @@
 import re
 from collections import Counter, defaultdict
+from decimal import Decimal
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import or_, select
@@ -33,6 +35,18 @@ def serialize_card(card: Card):
         "keywords": card.keywords,
     }
 
+def number_or_zero(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, Decimal):
+        return float(value)
+    return float(value)
+
+
+def int_or_zero(value: Any) -> int:
+    if value is None:
+        return 0
+    return int(value)
 
 def serialize_deck(deck: Deck):
     return {
@@ -518,22 +532,21 @@ def analyze_deck_data(deck: Deck, rows: list[tuple[DeckCard, Card]]):
         if not is_land:
             nonland_cards += quantity
 
-            mana_value = int(card.mana_value or 0)
+            mana_value = int_or_zero(card.mana_value)
             bucket = "7+" if mana_value >= 7 else str(mana_value)
             mana_curve[bucket] += quantity
 
     average_mana_value = None
 
     if nonland_cards > 0:
-        weighted_mana_total = 0
-
+        weighted_mana_total = 0.0
         for deck_card, card in rows:
             is_land = card.type_line and "Land" in card.type_line
-
             if is_land:
                 continue
 
-            weighted_mana_total += (card.mana_value or 0) * deck_card.quantity
+            quantity = int_or_zero(deck_card.quantity)
+            weighted_mana_total += number_or_zero(card.mana_value) * quantity
 
         average_mana_value = round(weighted_mana_total / nonland_cards, 2)
 
@@ -653,7 +666,7 @@ def diagnose_deck_data(deck: Deck, rows: list[tuple[DeckCard, Card]]):
     color_counts = Counter()
 
     for deck_card, card in rows:
-        quantity = deck_card.quantity
+        quantity = int_or_zero(deck_card.quantity)
         total_cards += quantity
 
         primary_type = classify_card_type(card.type_line)
@@ -673,7 +686,7 @@ def diagnose_deck_data(deck: Deck, rows: list[tuple[DeckCard, Card]]):
             land_cards += quantity
         else:
             nonland_cards += quantity
-            weighted_mana_total += (card.mana_value or 0) * quantity
+            weighted_mana_total += number_or_zero(card.mana_value) * quantity
 
     average_mana_value = None
 
@@ -947,12 +960,23 @@ def build_deck_coach_report(
     diagnosis: dict,
     suggestions_response: dict | None,
     user_goal: str | None,
+    ignored_categories: list[str] | None = None,
 ) -> str:
     summary = diagnosis.get("summary", {})
     themes = diagnosis.get("themes", [])
     findings = diagnosis.get("findings", [])
     issues = rules_check.get("issues", [])
     suggestions = suggestions_response.get("suggestions", []) if suggestions_response else []
+    ignored_set = {
+        category.strip().lower()
+        for category in (ignored_categories or [])
+        if category and category.strip()
+    }
+    filtered_findings = [
+        finding
+        for finding in findings
+        if str(finding.get("category", "")).strip().lower() not in ignored_set
+    ]
 
     lines = []
 
@@ -961,6 +985,10 @@ def build_deck_coach_report(
 
     if user_goal:
         lines.append(f"**Goal:** {user_goal}")
+        lines.append("")
+
+    if ignored_set:
+        lines.append("**Ignoring categories:** " + ", ".join(sorted(ignored_set)))
         lines.append("")
 
     lines.append("## Snapshot")
@@ -989,10 +1017,10 @@ def build_deck_coach_report(
     lines.append("")
 
     lines.append("## Diagnosis")
-    if not findings:
+    if not filtered_findings:
         lines.append("No diagnosis findings yet. Add more cards to make the analysis more useful.")
     else:
-        for finding in findings[:8]:
+        for finding in filtered_findings[:8]:
             icon = severity_label(finding.get("severity", "info"))
             category = finding.get("category", "general")
             message = finding.get("message", "")
@@ -1032,11 +1060,11 @@ def build_deck_coach_report(
     lines.append("## Next action")
     if suggestions:
         lines.append("Review the suggested additions, add the ones that fit your budget/power level, then re-run Deck Health.")
-    elif findings:
+    elif filtered_findings:
         first_goal = next(
             (
                 finding.get("suggested_goal")
-                for finding in findings
+                for finding in filtered_findings
                 if finding.get("suggested_goal")
             ),
             None,
