@@ -39,6 +39,13 @@ class ImportDecklistRequest(BaseModel):
     decklist: str
     replace_existing: bool = False
 
+class DeckCoachRequest(BaseModel):
+    deck_id: int
+    goal: str | None = None
+    suggestion_limit: int = 5
+    max_mana_value: float | None = None
+    include_tool_payloads: bool = True
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -452,6 +459,140 @@ def classify_card_type(type_line: str | None) -> str:
             return card_type
 
     return "Other"
+
+def severity_label(severity: str) -> str:
+    labels = {
+        "error": "❌",
+        "warning": "⚠️",
+        "info": "ℹ️",
+        "ok": "✅",
+    }
+
+    return labels.get(severity, "•")
+
+
+def build_deck_coach_report(
+    deck: Deck,
+    analysis: dict,
+    rules_check: dict,
+    diagnosis: dict,
+    suggestions_response: dict | None,
+    user_goal: str | None,
+) -> str:
+    summary = diagnosis.get("summary", {})
+    themes = diagnosis.get("themes", [])
+    findings = diagnosis.get("findings", [])
+    issues = rules_check.get("issues", [])
+    suggestions = suggestions_response.get("suggestions", []) if suggestions_response else []
+
+    lines = []
+
+    lines.append(f"# Deck Coach Report: {deck.name}")
+    lines.append("")
+
+    if user_goal:
+        lines.append(f"**Goal:** {user_goal}")
+        lines.append("")
+
+    lines.append("## Snapshot")
+    lines.append(
+        f"- Format: {deck.format or 'Unknown'}"
+    )
+    lines.append(
+        f"- Total cards: {summary.get('total_cards', 0)}"
+    )
+    lines.append(
+        f"- Lands: {summary.get('land_cards', 0)}"
+    )
+    lines.append(
+        f"- Nonlands: {summary.get('nonland_cards', 0)}"
+    )
+    lines.append(
+        f"- Average mana value: {summary.get('average_mana_value') or '—'}"
+    )
+    lines.append("")
+
+    if themes:
+        lines.append("## Detected themes")
+        for theme in themes[:8]:
+            lines.append(f"- {theme}")
+        lines.append("")
+
+    lines.append("## Rules check")
+    if rules_check.get("is_valid"):
+        lines.append("✅ No major rules issues detected by the current checker.")
+    else:
+        if not issues:
+            lines.append("No specific rules issues were returned.")
+        for issue in issues[:8]:
+            icon = severity_label(issue.get("severity", "info"))
+            lines.append(f"- {icon} {issue.get('message')}")
+    lines.append("")
+
+    lines.append("## Diagnosis")
+    if not findings:
+        lines.append("No diagnosis findings yet. Add more cards to make the analysis more useful.")
+    else:
+        for finding in findings[:8]:
+            icon = severity_label(finding.get("severity", "info"))
+            category = finding.get("category", "general")
+            message = finding.get("message", "")
+            lines.append(f"- {icon} **{category}:** {message}")
+    lines.append("")
+
+    if suggestions:
+        lines.append("## Suggested additions")
+        for index, suggestion in enumerate(suggestions, start=1):
+            card = suggestion["card"]
+            score = suggestion.get("score")
+            score_text = f" — score {score:.3f}" if isinstance(score, float) else ""
+
+            lines.append(
+                f"{index}. **{card['name']}**{score_text}"
+            )
+
+            if card.get("mana_cost"):
+                lines.append(f"   - Mana cost: {card['mana_cost']}")
+
+            if card.get("type_line"):
+                lines.append(f"   - Type: {card['type_line']}")
+
+            if card.get("oracle_text"):
+                oracle = card["oracle_text"].replace("\n", " ")
+                if len(oracle) > 220:
+                    oracle = oracle[:217] + "..."
+                lines.append(f"   - Text: {oracle}")
+
+            lines.append(
+                "   - Why: Semantically matched against the deck diagnosis, current themes, and stated goal."
+            )
+    else:
+        lines.append("## Suggested additions")
+        lines.append("No suggestions were generated. Add more cards to the deck or re-index Qdrant if the vector database is empty.")
+
+    lines.append("")
+
+    lines.append("## Next action")
+    if suggestions:
+        lines.append("Review the suggested additions, add the ones that fit your budget/power level, then re-run Deck Health.")
+    elif findings:
+        first_goal = next(
+            (
+                finding.get("suggested_goal")
+                for finding in findings
+                if finding.get("suggested_goal")
+            ),
+            None,
+        )
+
+        if first_goal:
+            lines.append(f"Try searching suggestions with this goal: **{first_goal}**")
+        else:
+            lines.append("Add more cards or choose a clearer improvement goal.")
+    else:
+        lines.append("Add more cards to make the coach more useful.")
+
+    return "\n".join(lines)
 
 @app.get("/cards/{card_id}")
 def get_card(card_id: int, db: Session = Depends(get_db)):
@@ -1188,3 +1329,100 @@ def diagnose_deck(
         "color_counts": dict(color_counts),
         "findings": findings,
     }
+
+@app.post("/agent/deck-coach")
+def deck_coach_agent(
+    request: DeckCoachRequest,
+    db: Session = Depends(get_db),
+):
+    deck = db.get(Deck, request.deck_id)
+
+    if not deck:
+        raise HTTPException(status_code=404, detail="Deck not found")
+
+    rows = get_deck_card_rows(db, request.deck_id)
+
+    if not rows:
+        return {
+            "deck": serialize_deck(deck),
+            "coach_report": (
+                f"# Deck Coach Report: {deck.name}\n\n"
+                "This deck has no cards yet. Add or import a decklist first, then run the coach again."
+            ),
+            "tool_payloads": {} if request.include_tool_payloads else None,
+        }
+
+    analysis = analyze_deck(
+        deck_id=request.deck_id,
+        db=db,
+    )
+
+    rules_check = check_deck_rules(
+        deck_id=request.deck_id,
+        db=db,
+    )
+
+    diagnosis = diagnose_deck(
+        deck_id=request.deck_id,
+        db=db,
+    )
+
+    suggested_goal = request.goal
+
+    if not suggested_goal:
+        for finding in diagnosis.get("findings", []):
+            if finding.get("severity") in {"error", "warning", "info"}:
+                if finding.get("suggested_goal"):
+                    suggested_goal = finding["suggested_goal"]
+                    break
+
+    if not suggested_goal:
+        themes = diagnosis.get("themes", [])
+        if themes:
+            suggested_goal = f"cards that support these deck themes: {', '.join(themes[:5])}"
+        else:
+            suggested_goal = "cards that improve this deck's main strategy"
+
+    suggestions_response = None
+
+    try:
+        suggestions_response = suggest_cards_for_deck(
+            deck_id=request.deck_id,
+            request=DeckSuggestionRequest(
+                goal=suggested_goal,
+                limit=request.suggestion_limit,
+                max_mana_value=request.max_mana_value,
+                color_identity=None,
+            ),
+            db=db,
+        )
+    except HTTPException:
+        suggestions_response = {
+            "query_used": suggested_goal,
+            "suggestions": [],
+        }
+
+    coach_report = build_deck_coach_report(
+        deck=deck,
+        analysis=analysis,
+        rules_check=rules_check,
+        diagnosis=diagnosis,
+        suggestions_response=suggestions_response,
+        user_goal=request.goal,
+    )
+
+    response = {
+        "deck": serialize_deck(deck),
+        "goal_used": suggested_goal,
+        "coach_report": coach_report,
+    }
+
+    if request.include_tool_payloads:
+        response["tool_payloads"] = {
+            "analysis": analysis,
+            "rules_check": rules_check,
+            "diagnosis": diagnosis,
+            "suggestions": suggestions_response,
+        }
+
+    return response

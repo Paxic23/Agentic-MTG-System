@@ -55,6 +55,15 @@ type DeckSuggestionResponse = {
   suggestions: DeckSuggestion[];
 };
 
+type DeckCoachResponse = {
+  deck: Deck;
+  goal_used: string;
+  coach_report: string;
+  tool_payloads?: {
+    suggestions?: DeckSuggestionResponse;
+  } | null;
+};
+
 type DeckImportResult = {
   deck_id: number;
   imported_count: number;
@@ -75,6 +84,42 @@ type DeckImportResult = {
 type DeckExportResult = {
   deck: Deck;
   decklist: string;
+};
+
+type RulesCheckIssue = {
+  severity: "error" | "warning" | "info" | "ok";
+  code: string;
+  message: string;
+};
+
+type RulesCheck = {
+  deck: Deck;
+  format: string | null;
+  is_valid: boolean;
+  total_cards: number;
+  issues: RulesCheckIssue[];
+};
+
+type DiagnosisFinding = {
+  severity: "error" | "warning" | "info" | "ok";
+  category: string;
+  message: string;
+  suggested_goal: string | null;
+};
+
+type DeckDiagnosis = {
+  deck: Deck;
+  summary: {
+    total_cards: number;
+    land_cards: number;
+    nonland_cards: number;
+    average_mana_value: number | null;
+  };
+  themes: string[];
+  role_counts: Record<string, number>;
+  type_counts: Record<string, number>;
+  color_counts: Record<string, number>;
+  findings: DiagnosisFinding[];
 };
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -113,6 +158,10 @@ export default function App() {
   const [exportedDecklist, setExportedDecklist] = useState("");
   const [decklistLoading, setDecklistLoading] = useState(false);
 
+  const [rulesCheck, setRulesCheck] = useState<RulesCheck | null>(null);
+  const [deckDiagnosis, setDeckDiagnosis] = useState<DeckDiagnosis | null>(null);
+  const [deckHealthLoading, setDeckHealthLoading] = useState(false);
+
   const isCommanderDeck =
     selectedDeck?.format?.toLowerCase() === "commander";
 
@@ -124,6 +173,15 @@ export default function App() {
     selectedDeck?.cards.reduce((total, entry) => total + entry.quantity, 0) ??
     0;
 
+  const [coachGoal, setCoachGoal] = useState(
+  "analyze this deck and suggest practical improvements"
+  );
+  const [coachMaxManaValue, setCoachMaxManaValue] = useState("");
+  const [coachReport, setCoachReport] = useState("");
+  const [coachGoalUsed, setCoachGoalUsed] = useState("");
+  const [coachSuggestions, setCoachSuggestions] = useState<DeckSuggestion[]>([]);
+  const [coachLoading, setCoachLoading] = useState(false);
+
 
   useEffect(() => {
     loadDecks();
@@ -131,11 +189,16 @@ export default function App() {
 
   useEffect(() => {
     if (selectedDeckId) {
-      loadSelectedDeck(Number(selectedDeckId));
-      loadDeckAnalysis(Number(selectedDeckId));
+      const deckId = Number(selectedDeckId);
+
+      loadSelectedDeck(deckId);
+      loadDeckAnalysis(deckId);
+      loadDeckHealth(deckId);
     } else {
       setSelectedDeck(null);
       setDeckAnalysis(null);
+      setRulesCheck(null);
+      setDeckDiagnosis(null);
     }
   }, [selectedDeckId]);
 
@@ -324,6 +387,7 @@ export default function App() {
 
       await loadSelectedDeck(Number(selectedDeckId));
       await loadDeckAnalysis(Number(selectedDeckId));
+      await loadDeckHealth(Number(selectedDeckId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not set commander");
     }
@@ -402,6 +466,12 @@ export default function App() {
     } else {
       searchSemanticCards();
     }
+  }
+
+  function useSuggestedGoal(goal: string | null) {
+    if (!goal) return;
+
+    setSuggestionGoal(goal);
   }
 
   async function addCardToSelectedDeck(cardId: number) {
@@ -542,6 +612,88 @@ export default function App() {
     }
 
     await navigator.clipboard.writeText(exportedDecklist);
+  }
+
+  async function loadDeckHealth(deckId: number) {
+    setDeckHealthLoading(true);
+    setError("");
+
+    try {
+      const [rulesResponse, diagnosisResponse] = await Promise.all([
+        fetch(`${API_URL}/decks/${deckId}/rules-check`),
+        fetch(`${API_URL}/decks/${deckId}/diagnosis`),
+      ]);
+
+      if (!rulesResponse.ok) {
+        throw new Error(`Could not load rules check: ${rulesResponse.status}`);
+      }
+
+      if (!diagnosisResponse.ok) {
+        throw new Error(
+          `Could not load deck diagnosis: ${diagnosisResponse.status}`
+        );
+      }
+
+      const rulesData: RulesCheck = await rulesResponse.json();
+      const diagnosisData: DeckDiagnosis = await diagnosisResponse.json();
+
+      setRulesCheck(rulesData);
+      setDeckDiagnosis(diagnosisData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load deck health");
+    } finally {
+      setDeckHealthLoading(false);
+    }
+  }
+
+  async function runDeckCoach() {
+    if (!selectedDeckId) {
+      setError("Create or select a deck first");
+      return;
+    }
+
+    setCoachLoading(true);
+    setError("");
+    setCoachReport("");
+    setCoachGoalUsed("");
+    setCoachSuggestions([]);
+
+    try {
+      const response = await fetch(`${API_URL}/agent/deck-coach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deck_id: Number(selectedDeckId),
+          goal: coachGoal.trim() || null,
+          suggestion_limit: 5,
+          max_mana_value: coachMaxManaValue
+            ? Number(coachMaxManaValue)
+            : null,
+          include_tool_payloads: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(
+          errorBody?.detail ?? `Could not run deck coach: ${response.status}`
+        );
+      }
+
+      const data: DeckCoachResponse = await response.json();
+
+      setCoachReport(data.coach_report);
+      setCoachGoalUsed(data.goal_used);
+      setCoachSuggestions(
+        data.tool_payloads?.suggestions?.suggestions ?? []
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not run deck coach");
+    } finally {
+      setCoachLoading(false);
+    }
   }
 
   return (
@@ -957,6 +1109,103 @@ export default function App() {
             </section>
           )}
 
+          {selectedDeck && (
+            <section className="panel-card">
+              <div className="panel-title-row">
+                <h2>Deck Health</h2>
+                {deckHealthLoading && <span>Checking...</span>}
+              </div>
+
+              {rulesCheck && (
+                <div
+                  className={`rules-status ${
+                    rulesCheck.is_valid ? "valid" : "invalid"
+                  }`}
+                >
+                  <strong>{rulesCheck.is_valid ? "Valid-ish" : "Needs attention"}</strong>
+                  <span>
+                    {rulesCheck.format ?? "Unknown format"} · {rulesCheck.total_cards} cards
+                  </span>
+                </div>
+              )}
+
+              {rulesCheck && rulesCheck.issues.length > 0 && (
+                <>
+                  <h3>Rules check</h3>
+
+                  <div className="health-list">
+                    {rulesCheck.issues.map((issue, index) => (
+                      <div
+                        key={`${issue.code}-${index}`}
+                        className={`health-item ${issue.severity}`}
+                      >
+                        <strong>{issue.severity}</strong>
+                        <p>{issue.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {rulesCheck && rulesCheck.issues.length === 0 && (
+                <p className="muted">No rules issues detected.</p>
+              )}
+
+              {deckDiagnosis && (
+                <>
+                  <h3>Themes</h3>
+
+                  <div className="tag-list">
+                    {deckDiagnosis.themes.length > 0 ? (
+                      deckDiagnosis.themes.map((theme) => (
+                        <span key={theme}>{theme}</span>
+                      ))
+                    ) : (
+                      <span>No strong themes detected yet</span>
+                    )}
+                  </div>
+
+                  <h3>Findings</h3>
+
+                  <div className="health-list">
+                    {deckDiagnosis.findings.map((finding, index) => (
+                      <div
+                        key={`${finding.category}-${index}`}
+                        className={`health-item ${finding.severity}`}
+                      >
+                        <strong>{finding.category}</strong>
+                        <p>{finding.message}</p>
+
+                        {finding.suggested_goal && (
+                          <button
+                            className="small-action-button"
+                            onClick={() => useSuggestedGoal(finding.suggested_goal)}
+                          >
+                            Use as suggestion goal
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <h3>Role counts</h3>
+
+                  <div className="role-grid">
+                    {Object.entries(deckDiagnosis.role_counts)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([role, count]) => (
+                        <div key={role}>
+                          <span>{role}</span>
+                          <strong>{count}</strong>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+
           {deckAnalysis && (
             <section className="panel-card">
               <h2>Analysis</h2>
@@ -1025,6 +1274,96 @@ export default function App() {
                 {Object.keys(deckAnalysis.color_identity_counts).length ===
                   0 && <span>Colorless / none</span>}
               </div>
+            </section>
+          )}
+          {selectedDeck && (
+            <section className="panel-card">
+              <h2>Deck Coach</h2>
+
+              <div className="field">
+                <label>Coach goal</label>
+                <textarea
+                  value={coachGoal}
+                  onChange={(event) => setCoachGoal(event.target.value)}
+                  placeholder="make this deck better at surviving board wipes"
+                />
+              </div>
+
+              <div className="field">
+                <label>Max mana value for suggested cards</label>
+                <input
+                  value={coachMaxManaValue}
+                  onChange={(event) => setCoachMaxManaValue(event.target.value)}
+                  placeholder="5"
+                  type="number"
+                />
+              </div>
+
+              <button
+                className="primary-button"
+                onClick={runDeckCoach}
+                disabled={coachLoading}
+              >
+                {coachLoading ? "Running coach..." : "Run Deck Coach"}
+              </button>
+
+              {coachGoalUsed && (
+                <div className="coach-goal-used">
+                  <strong>Goal used</strong>
+                  <p>{coachGoalUsed}</p>
+                </div>
+              )}
+
+              {coachReport && (
+                <div className="coach-report-box">
+                  <h3>Coach report</h3>
+                  <pre>{coachReport}</pre>
+                </div>
+              )}
+
+              {coachSuggestions.length > 0 && (
+                <div className="coach-suggestions">
+                  <h3>Coach suggestions</h3>
+
+                  <div className="suggestion-list">
+                    {coachSuggestions.map((suggestion) => (
+                      <article key={suggestion.card.id} className="suggestion-card">
+                        <div className="suggestion-header">
+                          <div>
+                            <strong>{suggestion.card.name}</strong>
+                            <p>{suggestion.card.type_line}</p>
+                          </div>
+
+                          <span>{suggestion.card.mana_cost}</span>
+                        </div>
+
+                        {suggestion.card.oracle_text && (
+                          <p className="suggestion-text">
+                            {suggestion.card.oracle_text}
+                          </p>
+                        )}
+
+                        <div className="metadata">
+                          <span>MV: {suggestion.card.mana_value ?? "—"}</span>
+                          <span>
+                            Score:{" "}
+                            {suggestion.score !== undefined
+                              ? suggestion.score.toFixed(3)
+                              : "—"}
+                          </span>
+                        </div>
+
+                        <button
+                          className="secondary-button"
+                          onClick={() => addCardToSelectedDeck(suggestion.card.id)}
+                        >
+                          Add coach suggestion
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           )}
         </aside>

@@ -623,6 +623,182 @@ textarea {
   font-size: 12px;
 }
 
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.panel-title-row h2 {
+  margin: 0 0 12px;
+}
+
+.panel-title-row span {
+  color: #a1a1aa;
+  font-size: 13px;
+}
+
+.rules-status {
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #3f3f46;
+  background: #101114;
+}
+
+.rules-status strong {
+  display: block;
+  font-size: 18px;
+}
+
+.rules-status span {
+  display: block;
+  margin-top: 4px;
+  color: #a1a1aa;
+  font-size: 13px;
+}
+
+.rules-status.valid {
+  border-color: #86efac;
+}
+
+.rules-status.invalid {
+  border-color: #fca5a5;
+}
+
+.health-list {
+  display: grid;
+  gap: 10px;
+}
+
+.health-item {
+  background: #101114;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.health-item strong {
+  display: block;
+  text-transform: capitalize;
+  font-size: 14px;
+}
+
+.health-item p {
+  margin: 6px 0 0;
+  color: #d4d4d8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.health-item.error {
+  border-color: #fca5a5;
+}
+
+.health-item.warning {
+  border-color: #fde68a;
+}
+
+.health-item.info {
+  border-color: #93c5fd;
+}
+
+.health-item.ok {
+  border-color: #86efac;
+}
+
+.small-action-button {
+  margin-top: 10px;
+  background: #27272a;
+  color: #f4f4f5;
+  border: 1px solid #3f3f46;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.small-action-button:hover {
+  border-color: #71717a;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.role-grid div {
+  background: #101114;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.role-grid span {
+  display: block;
+  color: #a1a1aa;
+  font-size: 12px;
+}
+
+.role-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.coach-goal-used {
+  margin-top: 16px;
+  background: #101114;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.coach-goal-used strong {
+  display: block;
+  font-size: 14px;
+}
+
+.coach-goal-used p {
+  margin: 6px 0 0;
+  color: #d4d4d8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coach-report-box {
+  margin-top: 16px;
+  border-top: 1px solid #27272a;
+  padding-top: 12px;
+}
+
+.coach-report-box h3,
+.coach-suggestions h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.coach-report-box pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #101114;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 12px;
+  color: #e4e4e7;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.coach-suggestions {
+  margin-top: 16px;
+  border-top: 1px solid #27272a;
+  padding-top: 12px;
+}
+
 
 
 @media (max-width: 900px) {
