@@ -4,10 +4,10 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
     "react": "latest",
-    "react-dom": "latest"
-  },
-  "devDependencies": {}
+    "react-dom": "latest",
+    "react-router-dom": "^7.15.1",
+    "typescript": "latest",
+    "vite": "latest"
+  }
 }

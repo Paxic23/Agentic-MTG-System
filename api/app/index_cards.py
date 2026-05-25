@@ -28,4 +28,4 @@ def index_cards(limit: int = 1000, batch_size: int = 64, recreate: bool = True):
 
 
 if __name__ == "__main__":
-    index_cards(limit=1000, batch_size=64, recreate=True)
+    index_cards(limit=10000, batch_size=64, recreate=True)

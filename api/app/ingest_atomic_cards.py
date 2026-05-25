@@ -23,7 +23,7 @@ def normalize_card(name: str, raw: dict) -> Card:
     )
 
 
-def ingest(limit: int = 1000):
+def ingest(limit: int = 10000):
     Base.metadata.create_all(bind=engine)
 
     if not DATA_PATH.exists():
@@ -60,4 +60,4 @@ def ingest(limit: int = 1000):
 
 
 if __name__ == "__main__":
-    ingest(limit=1000)
+    ingest(limit=10000)
