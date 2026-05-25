@@ -502,7 +502,6 @@ textarea {
 
 .oracle-text,
 .suggestion-text,
-.coach-report-box pre,
 .health-item p {
   white-space: pre-line;
   line-height: 1.5;
@@ -742,13 +741,64 @@ textarea {
   padding: 0.6rem;
 }
 
-.coach-report-box pre {
-  max-height: 360px;
+.coach-report-content {
+  max-height: 380px;
   overflow: auto;
-  padding: 0.75rem;
+  padding: 0.8rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel-solid) 90%, transparent);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.coach-report-title,
+.coach-report-heading,
+.coach-report-paragraph,
+.coach-report-label-row p,
+.coach-report-list {
+  margin: 0;
+}
+
+.coach-report-title {
+  font-size: 1rem;
+}
+
+.coach-report-heading {
+  margin-top: 0.2rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.coach-report-paragraph,
+.coach-report-label-row p,
+.coach-report-list li {
+  line-height: 1.55;
+}
+
+.coach-report-label-row {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel-solid) 84%, var(--accent) 6%);
+  padding: 0.5rem 0.6rem;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.coach-report-spacer {
+  height: 0.22rem;
+}
+
+.coach-report-list {
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.coach-report-list-numbered {
+  padding-left: 1.35rem;
 }
 
 h3 {

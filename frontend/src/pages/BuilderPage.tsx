@@ -150,7 +150,7 @@ export function BuilderPage({ lab }: BuilderPageProps) {
       <aside className="stack">
         <SectionCard title="Import / Export" subtitle="Decklist workflow" defaultOpen={false}>
           <label className="field">
-            <span>Paste decklist</span>
+            <span>Paste decklist: Moxfield works best</span>
             <textarea
               value={lab.importDecklistText}
               onChange={(event) => lab.setImportDecklistText(event.target.value)}
@@ -170,6 +170,10 @@ export function BuilderPage({ lab }: BuilderPageProps) {
           <div className="button-row">
             <button className="primary-button" onClick={lab.importDecklist} disabled={lab.decklistLoading} type="button">
               {lab.decklistLoading ? "Working..." : "Import decklist"}
+            </button>
+
+            <button className="secondary-button no-margin" onClick={lab.createDeckFromImport} disabled={lab.decklistLoading} type="button">
+              Create deck + import
             </button>
 
             <button className="secondary-button no-margin" onClick={lab.exportDecklist} disabled={lab.decklistLoading} type="button">

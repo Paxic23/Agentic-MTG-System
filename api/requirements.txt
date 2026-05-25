@@ -3,5 +3,8 @@ uvicorn[standard]
 sqlalchemy
 psycopg[binary]
 pydantic
+pydantic-settings
 qdrant-client
 sentence-transformers
+langgraph
+openai

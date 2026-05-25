@@ -156,11 +156,11 @@ export function SearchPage({ lab }: SearchPageProps) {
       <aside className="stack">
         <SectionCard title="Suggestions" subtitle="Context-aware card recommendations" defaultOpen={false}>
           <label className="field">
-            <span>Goal</span>
+            <span>Goal (optional)</span>
             <textarea
               value={lab.suggestionGoal}
               onChange={(event) => lab.setSuggestionGoal(event.target.value)}
-              placeholder="more cards that support this deck's main strategy"
+              placeholder="Example: protection for a creature-heavy strategy"
             />
           </label>
 

@@ -15,8 +15,10 @@ from app.services.deck_service import (
     analyze_deck_data,
     check_deck_rules_data,
     diagnose_deck_data,
+    find_card_for_import,
     get_deck_card_rows,
     get_deck_or_404,
+    is_probably_moxfield_decklist,
     parse_decklist_line,
     serialize_card,
     serialize_deck,
@@ -165,7 +167,7 @@ def import_decklist(
     request: ImportDecklistRequest,
     db: Session = Depends(get_db),
 ):
-    get_deck_or_404(db, deck_id)
+    deck = get_deck_or_404(db, deck_id)
 
     if request.replace_existing:
         existing_rows = db.scalars(
@@ -180,6 +182,12 @@ def import_decklist(
     imported = []
     unmatched = []
     skipped = []
+    should_assign_moxfield_commander = (
+        (deck.format or "").lower() == "commander"
+        and is_probably_moxfield_decklist(request.decklist)
+    )
+    commander_candidate_card_id: int | None = None
+    first_parsed_seen = False
 
     for raw_line in request.decklist.splitlines():
         parsed = parse_decklist_line(raw_line)
@@ -190,7 +198,12 @@ def import_decklist(
 
         quantity, card_name = parsed
 
-        card = db.scalar(select(Card).where(Card.name.ilike(card_name)))
+        card = find_card_for_import(db, card_name)
+
+        if not first_parsed_seen:
+            first_parsed_seen = True
+            if card:
+                commander_candidate_card_id = card.id
 
         if not card:
             unmatched.append(
@@ -215,6 +228,28 @@ def import_decklist(
                 "card": serialize_card(card),
             }
         )
+
+    if should_assign_moxfield_commander and commander_candidate_card_id is not None:
+        # Session uses autoflush=False, so flush imported rows before selecting.
+        db.flush()
+
+        existing_rows = db.scalars(
+            select(DeckCard).where(DeckCard.deck_id == deck_id)
+        ).all()
+
+        for row in existing_rows:
+            row.is_commander = False
+
+        commander_row = db.scalar(
+            select(DeckCard).where(
+                DeckCard.deck_id == deck_id,
+                DeckCard.card_id == commander_candidate_card_id,
+            )
+        )
+
+        if commander_row:
+            commander_row.is_commander = True
+            commander_row.quantity = 1
 
     db.commit()
 

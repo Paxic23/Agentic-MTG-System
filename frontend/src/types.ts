@@ -55,7 +55,7 @@ export type DeckSuggestionResponse = {
 
 export type DeckCoachResponse = {
   deck: Deck;
-  goal_used: string;
+  goal_used: string | null;
   coach_report: string;
   tool_payloads?: {
     suggestions?: DeckSuggestionResponse;

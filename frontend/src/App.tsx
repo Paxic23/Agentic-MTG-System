@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { useDeckLab } from "./hooks/useDeckLab";
+import { AIHelperPage } from "./pages/AIHelperPage";
 import { BuilderPage } from "./pages/BuilderPage";
 import { InsightsPage } from "./pages/InsightsPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/search" element={<SearchPage lab={lab} />} />
             <Route path="/builder" element={<BuilderPage lab={lab} />} />
             <Route path="/insights" element={<InsightsPage lab={lab} />} />
+            <Route path="/ai-helper" element={<AIHelperPage lab={lab} />} />
           </Route>
         </Routes>
       </BrowserRouter>

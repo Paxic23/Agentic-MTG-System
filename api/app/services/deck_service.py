@@ -2,7 +2,7 @@ import re
 from collections import Counter, defaultdict
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Card, Deck, DeckCard
@@ -309,6 +309,8 @@ def parse_decklist_line(line: str) -> tuple[int, str] | None:
     if clean_line.lower().rstrip(":") in section_headers:
         return None
 
+    clean_line = re.sub(r"^(sb|sideboard|mb|mainboard|commander|companion)\s*:\s*", "", clean_line, flags=re.IGNORECASE)
+
     clean_line = re.sub(
         r"\s+\([A-Z0-9]{2,8}\)\s+\d+.*$",
         "",
@@ -338,6 +340,131 @@ def parse_decklist_line(line: str) -> tuple[int, str] | None:
         return None
 
     return quantity, name
+
+
+def is_probably_moxfield_decklist(decklist: str) -> bool:
+    patterned_lines = 0
+    checked_lines = 0
+
+    for raw_line in decklist.splitlines():
+        clean_line = raw_line.strip()
+
+        if not clean_line:
+            continue
+
+        parsed = parse_decklist_line(clean_line)
+        if parsed is None:
+            continue
+
+        checked_lines += 1
+
+        if re.search(r"\([A-Z0-9]{2,8}\)\s+[A-Z0-9]{2,8}-\d+", clean_line):
+            patterned_lines += 1
+        elif re.search(r"\[[A-Z0-9]{2,8}\]", clean_line):
+            patterned_lines += 1
+
+        if checked_lines >= 12:
+            break
+
+    return patterned_lines >= 2
+
+
+def _normalize_import_name(name: str) -> str:
+    normalized = re.sub(r"\s+", " ", name).strip().strip('"\'')
+
+    # Normalize split/transform separators from inconsistent clipboard formats.
+    normalized = re.sub(r"\s*//\s*", " // ", normalized)
+    normalized = re.sub(r"\s*/\s*", " / ", normalized)
+
+    # Strip set tags like (PLST) or [PLST], even when followed by collector tokens.
+    normalized = re.sub(r"\s*[\[(][A-Z0-9]{2,8}[\])]", "", normalized)
+
+    # Strip common trailing collector tokens: AKH-158, THB-9, #158, 158a.
+    normalized = re.sub(r"\s+[A-Z0-9]{2,8}-\d+[a-zA-Z]?$", "", normalized)
+    normalized = re.sub(r"\s+#\d+[a-zA-Z]?$", "", normalized)
+    normalized = re.sub(r"\s+\d+[a-zA-Z]?$", "", normalized)
+
+    # Remove optional trailing annotations from export formats.
+    normalized = re.sub(r"\s*\*[^*]+\*$", "", normalized)
+
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _build_import_name_candidates(name: str) -> list[str]:
+    cleaned = _normalize_import_name(name)
+
+    if not cleaned:
+        return []
+
+    candidates: list[str] = []
+
+    def add(candidate: str) -> None:
+        value = re.sub(r"\s+", " ", candidate).strip()
+        if value and value not in candidates:
+            candidates.append(value)
+
+    add(cleaned)
+
+    if " / " in cleaned and " // " not in cleaned:
+        add(cleaned.replace(" / ", " // "))
+
+    if " // " in cleaned and " / " not in cleaned:
+        add(cleaned.replace(" // ", " / "))
+
+    if cleaned.startswith("A-"):
+        add(cleaned[2:].strip())
+    else:
+        add(f"A-{cleaned}")
+
+    split_name = cleaned.replace(" / ", " // ")
+    if " // " in split_name:
+        parts = [part.strip() for part in split_name.split(" // ") if part.strip()]
+        for part in parts:
+            add(part)
+            add(f"A-{part}")
+
+        if len(parts) == 2:
+            # Some data sources index the reverse face order as a full card name.
+            add(f"{parts[1]} // {parts[0]}")
+            add(f"A-{parts[1]} // {parts[0]}")
+
+    return candidates
+
+
+def find_card_for_import(db: Session, raw_name: str) -> Card | None:
+    candidates = _build_import_name_candidates(raw_name)
+
+    if not candidates:
+        return None
+
+    for candidate in candidates:
+        card = db.scalar(select(Card).where(Card.name.ilike(candidate)))
+        if card:
+            return card
+
+    split_name = _normalize_import_name(raw_name).replace(" / ", " // ")
+    if " // " not in split_name:
+        return None
+
+    parts = [part.strip() for part in split_name.split(" // ") if part.strip()]
+    for part in parts:
+        card = db.scalar(
+            select(Card)
+            .where(
+                or_(
+                    Card.name.ilike(part),
+                    Card.name.ilike(f"{part} //%"),
+                    Card.name.ilike(f"%// {part}"),
+                    Card.name.ilike(f"A-{part}"),
+                    Card.name.ilike(f"A-{part} //%"),
+                )
+            )
+        )
+
+        if card:
+            return card
+
+    return None
 
 
 def add_or_increment_deck_card(

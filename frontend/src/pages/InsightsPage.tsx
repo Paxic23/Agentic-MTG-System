@@ -7,8 +7,7 @@ type InsightsPageProps = {
 
 export function InsightsPage({ lab }: InsightsPageProps) {
   return (
-    <div className="page-grid page-grid-insights">
-      <section className="stack">
+    <div className="stack">
         <SectionCard
           title="Deck health"
           subtitle={lab.deckHealthLoading ? "Refreshing checks..." : "Rules and structural diagnostics"}
@@ -56,12 +55,6 @@ export function InsightsPage({ lab }: InsightsPageProps) {
                   <div key={`${finding.category}-${index}`} className={`health-item ${finding.severity}`}>
                     <strong>{finding.category}</strong>
                     <p>{finding.message}</p>
-
-                    {finding.suggested_goal && (
-                      <button className="small-action-button" onClick={() => lab.useSuggestedGoal(finding.suggested_goal)} type="button">
-                        Use as suggestion goal
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -135,78 +128,6 @@ export function InsightsPage({ lab }: InsightsPageProps) {
             </div>
           </SectionCard>
         )}
-      </section>
-
-      <aside className="stack">
-        <SectionCard title="Deck coach" subtitle="Actionable tuning advice">
-          <label className="field">
-            <span>Coach goal</span>
-            <textarea
-              value={lab.coachGoal}
-              onChange={(event) => lab.setCoachGoal(event.target.value)}
-              placeholder="make this deck better at surviving board wipes"
-            />
-          </label>
-
-          <label className="field">
-            <span>Max mana value for suggestions</span>
-            <input
-              value={lab.coachMaxManaValue}
-              onChange={(event) => lab.setCoachMaxManaValue(event.target.value)}
-              placeholder="5"
-              type="number"
-            />
-          </label>
-
-          <button className="primary-button" onClick={lab.runDeckCoach} disabled={lab.coachLoading} type="button">
-            {lab.coachLoading ? "Running coach..." : "Run deck coach"}
-          </button>
-
-          {lab.coachGoalUsed && (
-            <div className="coach-goal-used">
-              <strong>Goal used</strong>
-              <p>{lab.coachGoalUsed}</p>
-            </div>
-          )}
-
-          {lab.coachReport && (
-            <div className="coach-report-box">
-              <h3>Coach report</h3>
-              <pre>{lab.coachReport}</pre>
-            </div>
-          )}
-
-          {lab.coachSuggestions.length > 0 && (
-            <div className="coach-suggestions">
-              <h3>Coach suggestions</h3>
-              <div className="suggestion-list">
-                {lab.coachSuggestions.map((suggestion) => (
-                  <article key={suggestion.card.id} className="suggestion-card">
-                    <div className="suggestion-header">
-                      <div>
-                        <strong>{suggestion.card.name}</strong>
-                        <p>{suggestion.card.type_line}</p>
-                      </div>
-                      <span>{suggestion.card.mana_cost}</span>
-                    </div>
-
-                    {suggestion.card.oracle_text && <p className="suggestion-text">{suggestion.card.oracle_text}</p>}
-
-                    <div className="metadata">
-                      <span>MV: {suggestion.card.mana_value ?? "-"}</span>
-                      <span>Score: {suggestion.score !== undefined ? suggestion.score.toFixed(3) : "-"}</span>
-                    </div>
-
-                    <button className="secondary-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button">
-                      Add coach suggestion
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </div>
-          )}
-        </SectionCard>
-      </aside>
     </div>
   );
 }

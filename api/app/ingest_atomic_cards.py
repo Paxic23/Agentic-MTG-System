@@ -60,4 +60,4 @@ def ingest(limit: int = 10000):
 
 
 if __name__ == "__main__":
-    ingest(limit=10000)
+    ingest(limit=80000)

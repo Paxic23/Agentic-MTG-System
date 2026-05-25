@@ -52,9 +52,7 @@ export function useDeckLab() {
   const [newDeckFormat, setNewDeckFormat] = useState("Commander");
   const [newDeckDescription, setNewDeckDescription] = useState("");
 
-  const [suggestionGoal, setSuggestionGoal] = useState(
-    "more cards that support this deck's main strategy",
-  );
+  const [suggestionGoal, setSuggestionGoal] = useState("");
   const [suggestionMaxManaValue, setSuggestionMaxManaValue] = useState("");
   const [suggestions, setSuggestions] = useState<DeckSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -69,9 +67,7 @@ export function useDeckLab() {
   const [deckDiagnosis, setDeckDiagnosis] = useState<DeckDiagnosis | null>(null);
   const [deckHealthLoading, setDeckHealthLoading] = useState(false);
 
-  const [coachGoal, setCoachGoal] = useState(
-    "analyze this deck and suggest practical improvements",
-  );
+  const [coachGoal, setCoachGoal] = useState("");
   const [coachMaxManaValue, setCoachMaxManaValue] = useState("");
   const [coachReport, setCoachReport] = useState("");
   const [coachGoalUsed, setCoachGoalUsed] = useState("");
@@ -260,14 +256,6 @@ export function useDeckLab() {
     }
   }
 
-  function useSuggestedGoal(goal: string | null) {
-    if (!goal) {
-      return;
-    }
-
-    setSuggestionGoal(goal);
-  }
-
   async function addCardToSelectedDeck(cardId: number) {
     if (!selectedDeckId) {
       setError("Create or select a deck first");
@@ -343,8 +331,57 @@ export function useDeckLab() {
   }
 
   async function importDecklist() {
-    if (!selectedDeckId) {
-      setError("Create or select a deck first");
+    if (!importDecklistText.trim()) {
+      setError("Paste a decklist first");
+      return;
+    }
+
+    setDecklistLoading(true);
+    setError("");
+    setImportResult(null);
+
+    try {
+      let targetDeckId = selectedDeckId;
+
+      if (!targetDeckId) {
+        if (!newDeckName.trim()) {
+          setError("Select a deck, or provide a deck name to create one during import");
+          return;
+        }
+
+        const createdDeck = await createDeckApi({
+          name: newDeckName.trim(),
+          format: newDeckFormat.trim() || null,
+          description: newDeckDescription.trim() || null,
+        });
+
+        targetDeckId = String(createdDeck.id);
+        setSelectedDeckId(targetDeckId);
+        setNewDeckName("");
+        setNewDeckDescription("");
+        await loadDecks();
+      }
+
+      const data = await importDecklistApi({
+        deckId: targetDeckId,
+        decklist: importDecklistText,
+        replaceExisting: replaceExistingImport,
+      });
+
+      setImportResult(data);
+
+      const deckId = Number(targetDeckId);
+      await Promise.all([loadSelectedDeck(deckId), loadDeckAnalysis(deckId), loadDeckHealth(deckId)]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import decklist");
+    } finally {
+      setDecklistLoading(false);
+    }
+  }
+
+  async function createDeckFromImport() {
+    if (!newDeckName.trim()) {
+      setError("Deck name is required to create a deck from import");
       return;
     }
 
@@ -358,18 +395,31 @@ export function useDeckLab() {
     setImportResult(null);
 
     try {
+      const createdDeck = await createDeckApi({
+        name: newDeckName.trim(),
+        format: newDeckFormat.trim() || null,
+        description: newDeckDescription.trim() || null,
+      });
+
+      const newDeckId = String(createdDeck.id);
+      setSelectedDeckId(newDeckId);
+
       const data = await importDecklistApi({
-        deckId: selectedDeckId,
+        deckId: newDeckId,
         decklist: importDecklistText,
         replaceExisting: replaceExistingImport,
       });
 
       setImportResult(data);
+      setNewDeckName("");
+      setNewDeckDescription("");
 
-      const deckId = Number(selectedDeckId);
+      await loadDecks();
+
+      const deckId = Number(newDeckId);
       await Promise.all([loadSelectedDeck(deckId), loadDeckAnalysis(deckId), loadDeckHealth(deckId)]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import decklist");
+      setError(err instanceof Error ? err.message : "Could not create deck from import");
     } finally {
       setDecklistLoading(false);
     }
@@ -424,7 +474,7 @@ export function useDeckLab() {
       });
 
       setCoachReport(data.coach_report);
-      setCoachGoalUsed(data.goal_used);
+      setCoachGoalUsed(data.goal_used ?? "");
       setCoachSuggestions(data.tool_payloads?.suggestions?.suggestions ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not run deck coach");
@@ -496,12 +546,12 @@ export function useDeckLab() {
       createDeck,
       handleSearch,
       loadDeckSuggestions,
-      useSuggestedGoal,
       addCardToSelectedDeck,
       removeCardFromSelectedDeck,
       setCardAsCommander,
       clearCommander,
       importDecklist,
+      createDeckFromImport,
       exportDecklist,
       copyExportedDecklist,
       runDeckCoach,
