@@ -28,3 +28,5 @@ api/app/utils/__pycache__
 api/app/utils/logger.pyc
 api/app/utils/redis.pyc
 api/app/utils/worker.pyc
+api/app/agents/graphs/__pycache__
+api/app/agents/__pycache__
