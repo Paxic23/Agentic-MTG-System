@@ -10,6 +10,71 @@ type GeneralChatPageProps = {
 
 type DeckContextMode = "active" | "all";
 
+function renderInline(text: string) {
+  const nodes: Array<string | JSX.Element> = [];
+  const boldPattern = /\*\*(.+?)\*\*/g;
+
+  let cursor = 0;
+  let match = boldPattern.exec(text);
+  while (match) {
+    if (match.index > cursor) {
+      nodes.push(text.slice(cursor, match.index));
+    }
+
+    nodes.push(<strong key={`bold-${cursor}`}>{match[1]}</strong>);
+    cursor = match.index + match[0].length;
+    match = boldPattern.exec(text);
+  }
+
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+
+  return nodes.length > 0 ? nodes : [text];
+}
+
+function renderAssistantMessage(content: string) {
+  const blocks = content
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return blocks.map((block, blockIndex) => {
+    const lines = block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const headingMatch = lines[0]?.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      const HeadingTag = level === 1 ? "h2" : level === 2 ? "h3" : "h4";
+      const bodyLines = lines.slice(1);
+
+      return (
+        <section key={`block-${blockIndex}`}>
+          <HeadingTag>{renderInline(headingText)}</HeadingTag>
+          {bodyLines.length > 0 && <p>{renderInline(bodyLines.join(" "))}</p>}
+        </section>
+      );
+    }
+
+    const isList = lines.every((line) => /^[-*]\s+/.test(line));
+    if (isList) {
+      return (
+        <ul key={`block-${blockIndex}`}>
+          {lines.map((line, lineIndex) => (
+            <li key={`item-${blockIndex}-${lineIndex}`}>{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    return <p key={`block-${blockIndex}`}>{renderInline(lines.join(" "))}</p>;
+  });
+}
+
 export function GeneralChatPage({ lab }: GeneralChatPageProps) {
   const [messages, setMessages] = useState<GeneralChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -153,7 +218,13 @@ export function GeneralChatPage({ lab }: GeneralChatPageProps) {
               className={`chat-message ${message.role === "user" ? "chat-message-user" : "chat-message-assistant"}`}
             >
               <header>{message.role === "user" ? "You" : "Assistant"}</header>
-              <p>{message.content}</p>
+              {message.role === "assistant" ? (
+                <div className="chat-markdown">
+                  {renderAssistantMessage(message.content)}
+                </div>
+              ) : (
+                <p>{message.content}</p>
+              )}
             </article>
           ))}
 
