@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -62,7 +62,16 @@ class GeneralChatRequest(BaseModel):
     deck_ids: list[int] = Field(default_factory=list)
 
 
+class GeneralChatToolTrace(BaseModel):
+    tool: str
+    args: dict[str, Any] = Field(default_factory=dict)
+    ok: bool = True
+    summary: str | None = None
+
+
 class GeneralChatResponse(BaseModel):
     reply: str
     used_deck_context: bool = False
     referenced_deck_count: int = 0
+    used_agentic_tools: bool = False
+    tool_trace: list[GeneralChatToolTrace] = Field(default_factory=list)

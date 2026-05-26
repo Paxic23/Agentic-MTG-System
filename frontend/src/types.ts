@@ -125,8 +125,17 @@ export type GeneralChatMessage = {
   content: string;
 };
 
+export type GeneralChatToolTrace = {
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  summary?: string | null;
+};
+
 export type GeneralChatResponse = {
   reply: string;
   used_deck_context: boolean;
   referenced_deck_count: number;
+  used_agentic_tools?: boolean;
+  tool_trace?: GeneralChatToolTrace[];
 };
