@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_base_url: str | None = None
     llm_api_key: str | None = None
-    llm_temperature: float = 0.2
+    llm_temperature: float = 0.1
     llm_timeout_seconds: float = 30.0
-    llm_max_output_tokens: int = 900
+    llm_max_output_tokens: int = 2000    # 900
 
     # Scryfall now expects both User-Agent and Accept headers. Put contact info
     # in this value for a public app, e.g. project URL or email.
