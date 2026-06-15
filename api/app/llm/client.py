@@ -1,5 +1,6 @@
+import json
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from openai import BadRequestError, OpenAI
 
@@ -9,6 +10,19 @@ class LLMCompletion:
     text: str
     provider: str
     model: str
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass
+class LLMDecision:
+    tool_calls: list[ToolCall]
+    text: str | None
 
 
 class LLMClient(Protocol):
@@ -26,6 +40,17 @@ class LLMClient(Protocol):
     ) -> LLMCompletion:
         ...
 
+    def decide_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        temperature: float,
+        max_output_tokens: int,
+        force_text: bool = False,
+    ) -> LLMDecision:
+        ...
+
 
 class DisabledLLMClient:
     provider = "none"
@@ -40,6 +65,17 @@ class DisabledLLMClient:
         temperature: float,
         max_output_tokens: int,
     ) -> LLMCompletion:
+        raise RuntimeError("LLM is disabled")
+
+    def decide_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        temperature: float,
+        max_output_tokens: int,
+        force_text: bool = False,
+    ) -> LLMDecision:
         raise RuntimeError("LLM is disabled")
 
 
@@ -112,3 +148,52 @@ class OpenAICompatibleLLMClient:
             provider=self.provider,
             model=self.model,
         )
+
+    def decide_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        temperature: float,
+        max_output_tokens: int,
+        force_text: bool = False,
+    ) -> LLMDecision:
+        tool_choice = "none" if force_text else "auto"
+
+        request_kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": tool_choice,
+            "temperature": temperature,
+        }
+
+        try:
+            response = self._client.chat.completions.create(
+                **request_kwargs,
+                max_tokens=max_output_tokens,
+            )
+        except BadRequestError as exc:
+            message = str(exc).lower()
+            if "max_completion_tokens" not in message and "max_tokens" not in message:
+                raise
+
+            response = self._client.chat.completions.create(
+                **request_kwargs,
+                max_completion_tokens=max_output_tokens,
+            )
+
+        message = response.choices[0].message
+
+        if message.tool_calls:
+            calls = [
+                ToolCall(
+                    id=tc.id,
+                    name=tc.function.name,
+                    arguments=json.loads(tc.function.arguments),
+                )
+                for tc in message.tool_calls
+            ]
+            return LLMDecision(tool_calls=calls, text=None)
+
+        return LLMDecision(tool_calls=[], text=(message.content or "").strip())

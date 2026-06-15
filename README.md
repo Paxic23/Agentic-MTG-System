@@ -2,7 +2,7 @@
 
 A local development project for building, storing, searching, pricing, and analyzing Magic: The Gathering decks.
 
-The main AI feature is the **General Chat agent**. It can answer broad MTG questions, discuss your saved decks, analyze deck direction, help uncover useful cards, and suggest ideas to explore. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
+The main AI feature is the **General Chat agent**. It runs a dynamic agentic loop: the LLM decides which tools to call, executes them against the local database, and keeps going until it has enough information to answer. It can look up your decks, search cards by name or concept, and find upgrade suggestions — all driven by the conversation rather than hardcoded triggers. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
 
 This is a hobby/development system, not a production-ready web app. It currently has no authentication, no user accounts, and no production migration setup.
 
@@ -12,6 +12,18 @@ This is a hobby/development system, not a production-ready web app. It currently
 
 The General Chat endpoint is the central agentic/LLM feature of the system.
 
+It uses a dynamic tool-calling loop: the LLM reads the conversation, decides which tool to call (if any), gets the result, and repeats until it is ready to respond. This means it can chain multiple lookups in a single reply — for example, listing your decks, fetching the full card list of one of them, and then finding upgrades, all without you specifying those steps.
+
+**Available tools:**
+
+| Tool | What it does |
+|---|---|
+| `list_decks` | Lists all saved decks with id, name, and format. |
+| `get_deck_details` | Fetches the full card list and stats for a specific deck. |
+| `search_cards` | Filters the card database by name, oracle text, color identity, and mana value. |
+| `search_cards_semantic` | AI-powered semantic search via Qdrant — best for conceptual queries like “cheap green ramp” or “sacrifice outlets in black”. |
+| `find_upgrades` | Suggests cards to add to a specific deck based on its themes and a stated goal. |
+
 It is intended for questions like:
 
 - “What is this deck trying to do?”
@@ -19,8 +31,9 @@ It is intended for questions like:
 - “What kind of cards should I look for next?”
 - “Give me ideas for a Commander deck around this theme.”
 - “Analyze these decks and compare their game plans.”
+- “Find me some cheap blue card draw spells.”
 
-When requested, the chat endpoint can include deck context from the local database, so the AI can reason over saved decklists instead of only answering generic MTG questions.
+The `include_deck_context` flag preloads a summary of your saved decks into the system prompt. The LLM can then call `get_deck_details` for any deck it wants to inspect in full.
 
 ### Other notable functionality
 
@@ -46,6 +59,7 @@ There is an optional LLM enhancement path in the code, but it is disabled by def
 ## Tech stack
 
 - **Backend:** Python, FastAPI, SQLAlchemy
+- **Agent orchestration:** LangGraph (state graphs for both the General Chat loop and the deck-coach pipeline)
 - **Frontend:** Vite, TypeScript, CSS
 - **Relational database:** PostgreSQL
 - **Vector database:** Qdrant
@@ -53,7 +67,7 @@ There is an optional LLM enhancement path in the code, but it is disabled by def
 - **Card data:** MTGJSON `AtomicCards.json`
 - **Price data:** Scryfall bulk/default card data
 - **Containers:** Docker Compose
-- **LLM integration:** currently intended for non-local/OpenAI-compatible use; local LLM support may require code/config changes
+- **LLM integration:** OpenAI and OpenAI-compatible APIs; requires tool/function calling support
 
 ## Repository structure
 
@@ -76,8 +90,8 @@ The exact structure may change as the project develops, but the current project 
 │   │   │   ├── prices.py              # Price status, refresh, card/deck price lookup
 │   │   │   └── agent.py               # General Chat and deck-coach endpoints
 │   │   ├── services/                  # Deterministic deck, theme, price, and business logic
-│   │   ├── agents/                    # Deck-coach graph/tool orchestration
-│   │   ├── llm/                       # LLM provider abstraction and prompts
+│   │   ├── agents/                    # General Chat agentic loop and deck-coach graph/tool orchestration
+│   │   ├── llm/                       # LLM provider abstraction, tool-calling interface, and prompts
 │   │   └── core/                      # App settings/config
 │   ├── .env.example                   # Runtime/LLM configuration template
 │   └── Dockerfile
@@ -124,12 +138,6 @@ git clone https://github.com/Paxic23/Agentic-MTG-System.git
 cd Agentic-MTG-System
 ```
 
-If you are working from the refactored branch:
-
-```bash
-git checkout Better-File-Structure
-```
-
 ### 2. Add the card dataset
 
 Create a local data folder:
@@ -173,7 +181,7 @@ LLM_MODEL=gpt-4o-mini
 LLM_API_KEY=your_api_key_here
 LLM_TEMPERATURE=0.2
 LLM_TIMEOUT_SECONDS=30
-LLM_MAX_OUTPUT_TOKENS=900
+LLM_MAX_OUTPUT_TOKENS=2000
 LLM_ENABLE_DECK_COACH=false
 ```
 
@@ -186,7 +194,7 @@ LLM_BASE_URL=https://your-provider.example/v1
 LLM_API_KEY=your_api_key_here
 LLM_TEMPERATURE=0.2
 LLM_TIMEOUT_SECONDS=30
-LLM_MAX_OUTPUT_TOKENS=900
+LLM_MAX_OUTPUT_TOKENS=2000
 LLM_ENABLE_DECK_COACH=false
 ```
 
@@ -295,19 +303,20 @@ Relevant files:
 
 ```text
 api/app/routers/agent.py
-api/app/llm/
-api/app/llm/prompts/general_chat.py
+api/app/agents/general_chat.py
+api/app/agents/graphs/general_chat_graph.py
+api/app/llm/client.py
 api/app/core/config.py
 ```
 
 Customize these if you want to change:
 
 - Which provider/model is used.
-- The general chat prompt.
-- How deck context is included.
-- How many decks are passed into context.
+- The system prompt that guides the LLM's tool-calling behavior (`initialize_node` in `general_chat_graph.py`).
+- Which tools are available and what they do (`CHAT_TOOLS` and `_execute_tool` in `general_chat_graph.py`).
+- How many tool-call iterations the loop allows before forcing a final response (`MAX_ITERATIONS`).
+- How deck context is preloaded into the system prompt.
 - Temperature, timeout, and max-output settings.
-- How strongly the AI is guided toward analytics, card discovery, deck comparison, or general MTG help.
 
 ### LLM provider setup
 
@@ -500,10 +509,22 @@ All price endpoints are under `/prices`.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/agent/general-chat` | Main LLM-powered chat endpoint. Can include deck context for deck analysis, broad MTG questions, card discovery, and strategy discussion. |
-| `POST` | `/agent/deck-coach` | Structured deck-coach report. Primarily deterministic; optional LLM enhancement may be enabled separately. |
+| `POST` | `/agent/general-chat` | Main LLM-powered chat endpoint with dynamic tool-calling loop. |
+| `POST` | `/agent/deck-coach` | Structured deck-coach report. Primarily deterministic with optional LLM enhancement. |
 
-Example General Chat body:
+#### General Chat
+
+The LLM reads the conversation, calls tools as needed, and loops until it has enough to respond. Tools available to it:
+
+| Tool | Triggered when |
+|---|---|
+| `list_decks` | User asks about their collection or which decks they have. |
+| `get_deck_details` | User references a specific deck by name or id. |
+| `search_cards` | User wants to look up cards by name, text, or filter. |
+| `search_cards_semantic` | User describes cards conceptually ("cheap green ramp", "sacrifice outlets"). |
+| `find_upgrades` | User asks what to add to a deck or how to improve it. |
+
+Example request body:
 
 ```json
 {
@@ -518,7 +539,33 @@ Example General Chat body:
 }
 ```
 
-If `deck_ids` is empty and `include_deck_context` is true, the endpoint may use the available saved decks as context.
+If `deck_ids` is empty and `include_deck_context` is `true`, all saved decks are preloaded into the system prompt. The agent can then call `get_deck_details` for any deck it wants to inspect in full.
+
+#### Deck Coach
+
+Runs a fixed LangGraph pipeline — not a dynamic loop. Each step runs in order:
+
+1. **Load deck** — fetches the deck and all its cards from the database.
+2. **Analyze** — mana curve, card type distribution, color identity breakdown.
+3. **Rules check** — format legality, commander color identity, singleton violations, card count.
+4. **Diagnose** — detects weaknesses: low ramp, low card draw, insufficient removal, high mana curve, etc.
+5. **Choose goal** — resolves the coaching focus from the `goal` field (or uses a default).
+6. **Suggest cards** — semantic vector search for cards that fit the deck's themes and goal.
+7. **Build report** — assembles a deterministic Markdown report from all of the above.
+8. **Enhance with LLM** *(optional, off by default)* — rewrites the report using the configured LLM if `LLM_ENABLE_DECK_COACH=true`.
+
+Example request body:
+
+```json
+{
+  "deck_id": 1,
+  "goal": "more ramp and card draw",
+  "suggestion_limit": 5,
+  "max_mana_value": 4,
+  "include_tool_payloads": true,
+  "ignore_categories": []
+}
+```
 
 ## Helpers / reminders
 
@@ -697,7 +744,9 @@ docker compose restart api
 
 ### Local LLM does not work
 
-That is expected to need more work. The current setup should be treated as primarily configured for non-local/OpenAI-compatible AI providers. Local LLM use may require adjustments to provider configuration, model behavior, request formatting, timeout settings, and possibly the agent/prompt layer.
+That is expected to need more work. The current setup should be treated as primarily configured for non-local/OpenAI-compatible AI providers. Local LLM use may require adjustments to provider configuration, model behavior, request formatting, and timeout settings.
+
+In particular, the General Chat agent relies on **tool/function calling** support in the model. Many local LLMs either do not support this or behave inconsistently with the OpenAI tool-calling format. If your local model does not support tool calling, the agentic loop will not work as intended.
 
 ### Prices are missing
 
