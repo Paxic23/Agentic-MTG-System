@@ -2,7 +2,7 @@
 
 A local development project for building, storing, searching, pricing, and analyzing Magic: The Gathering decks.
 
-The main AI feature is the **General Chat agent**. It runs a dynamic agentic loop: the LLM decides which tools to call, executes them against the local database, and keeps going until it has enough information to answer. It can look up your decks, search cards by name or concept, and find upgrade suggestions — all driven by the conversation rather than hardcoded triggers. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
+The main AI feature is the **General Chat agent**. It runs a dynamic agentic loop: the LLM decides which tools to call, executes them against the local database, and keeps going until it has enough information to answer. It can look up your decks, search cards by name or concept, and find upgrade suggestions, all driven by the conversation instead of hardcoded triggers. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
 
 This is a hobby/development system, not a production-ready web app. It currently has no authentication, no user accounts, and no production migration setup.
 
@@ -12,7 +12,7 @@ This is a hobby/development system, not a production-ready web app. It currently
 
 The General Chat endpoint is the central agentic/LLM feature of the system.
 
-It uses a dynamic tool-calling loop: the LLM reads the conversation, decides which tool to call (if any), gets the result, and repeats until it is ready to respond. This means it can chain multiple lookups in a single reply — for example, listing your decks, fetching the full card list of one of them, and then finding upgrades, all without you specifying those steps.
+It uses a dynamic tool-calling loop: the LLM reads the conversation, decides which tool to call (if any), gets the result, and repeats until it is ready to respond. That means it can chain multiple lookups in a single reply, for example listing your decks, fetching the full card list of one of them, and then finding upgrades, all without you specifying those steps.
 
 **Available tools:**
 
@@ -21,17 +21,17 @@ It uses a dynamic tool-calling loop: the LLM reads the conversation, decides whi
 | `list_decks` | Lists all saved decks with id, name, and format. |
 | `get_deck_details` | Fetches the full card list and stats for a specific deck. |
 | `search_cards` | Filters the card database by name, oracle text, color identity, and mana value. |
-| `search_cards_semantic` | AI-powered semantic search via Qdrant — best for conceptual queries like “cheap green ramp” or “sacrifice outlets in black”. |
+| `search_cards_semantic` | AI-powered semantic search via Qdrant, best for conceptual queries like "cheap green ramp" or "sacrifice outlets in black". |
 | `find_upgrades` | Suggests cards to add to a specific deck based on its themes and a stated goal. |
 
 It is intended for questions like:
 
-- “What is this deck trying to do?”
-- “What are the weak points in my Lathiel deck?”
-- “What kind of cards should I look for next?”
-- “Give me ideas for a Commander deck around this theme.”
-- “Analyze these decks and compare their game plans.”
-- “Find me some cheap blue card draw spells.”
+- "What is this deck trying to do?"
+- "What are the weak points in my Lathiel deck?"
+- "What kind of cards should I look for next?"
+- "Give me ideas for a Commander deck around this theme."
+- "Analyze these decks and compare their game plans."
+- "Find me some cheap blue card draw spells."
 
 The `include_deck_context` flag preloads a summary of your saved decks into the system prompt. The LLM can then call `get_deck_details` for any deck it wants to inspect in full.
 
@@ -348,11 +348,11 @@ Customize these if you want to change:
 - Role detection such as ramp, card draw, sacrifice synergy, graveyard synergy, removal, and win conditions.
 - Commander thresholds for lands, ramp, card draw, removal, and board wipes.
 - How strongly minor synergies should be weighted.
-- How card suggestions are generated from the deck’s current themes.
+- How card suggestions are generated from the deck's current themes.
 - Commander legality and singleton checks.
 - The structured deck-coach report.
 
-This is also where you would improve cases where the system overstates small themes, such as tagging a deck as “graveyard synergy” or “sacrifice synergy” when those elements are only barely present.
+This is also where you would improve cases where the system overstates small themes, such as tagging a deck as "graveyard synergy" or "sacrifice synergy" when those elements are only barely present.
 
 ### Card ingestion
 
@@ -543,16 +543,16 @@ If `deck_ids` is empty and `include_deck_context` is `true`, all saved decks are
 
 #### Deck Coach
 
-Runs a fixed LangGraph pipeline — not a dynamic loop. Each step runs in order:
+Runs a fixed LangGraph pipeline, not a dynamic loop. Each step runs in order:
 
-1. **Load deck** — fetches the deck and all its cards from the database.
-2. **Analyze** — mana curve, card type distribution, color identity breakdown.
-3. **Rules check** — format legality, commander color identity, singleton violations, card count.
-4. **Diagnose** — detects weaknesses: low ramp, low card draw, insufficient removal, high mana curve, etc.
-5. **Choose goal** — resolves the coaching focus from the `goal` field (or uses a default).
-6. **Suggest cards** — semantic vector search for cards that fit the deck's themes and goal.
-7. **Build report** — assembles a deterministic Markdown report from all of the above.
-8. **Enhance with LLM** *(optional, off by default)* — rewrites the report using the configured LLM if `LLM_ENABLE_DECK_COACH=true`.
+1. **Load deck**: fetches the deck and all its cards from the database.
+2. **Analyze**: mana curve, card type distribution, color identity breakdown.
+3. **Rules check**: format legality, commander color identity, singleton violations, card count.
+4. **Diagnose**: detects weaknesses like low ramp, low card draw, insufficient removal, high mana curve, etc.
+5. **Choose goal**: resolves the coaching focus from the `goal` field (or uses a default).
+6. **Suggest cards**: semantic vector search for cards that fit the deck's themes and goal.
+7. **Build report**: assembles a deterministic Markdown report from all of the above.
+8. **Enhance with LLM** *(optional, off by default)*: rewrites the report using the configured LLM if `LLM_ENABLE_DECK_COACH=true`.
 
 Example request body:
 
@@ -760,7 +760,7 @@ Some cards or printings may still have missing prices depending on the Scryfall 
 
 ### Deck themes look overstated
 
-Theme detection currently uses simple heuristics over card text. If a card mentions “graveyard” or “sacrifice,” the system may count that as a theme even when it is not central to the deck.
+Theme detection currently uses simple heuristics over card text. If a card mentions "graveyard" or "sacrifice," the system may count that as a theme even when it is not central to the deck.
 
 The relevant logic lives in the deck service, especially role/theme detection and diagnosis thresholds. Improving this weighting is one of the most useful next development steps.
 
