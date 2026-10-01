@@ -54,10 +54,6 @@ class CardPriceSearchRequest(BaseModel):
     ids: list[int] = Field(default_factory=list)
 
 
-class CardPriceRefreshRequest(BaseModel):
-    force: bool = False
-
-
 class GeneralChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str

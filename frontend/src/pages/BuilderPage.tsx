@@ -1,4 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import type { DeckLabState } from "../hooks/useDeckLab";
+import { CardTable } from "../components/ui/CardTable";
+import { ManaCost } from "../components/ui/ManaCost";
 import { SectionCard } from "../components/ui/SectionCard";
 
 type BuilderPageProps = {
@@ -6,10 +9,12 @@ type BuilderPageProps = {
 };
 
 export function BuilderPage({ lab }: BuilderPageProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="page-grid page-grid-builder">
       <section className="stack">
-        <SectionCard title="Create deck" subtitle="Start a new deck in seconds">
+        <SectionCard title="New deck" defaultOpen={!lab.selectedDeck}>
           <div className="form-grid two">
             <label className="field">
               <span>Deck name</span>
@@ -99,11 +104,12 @@ export function BuilderPage({ lab }: BuilderPageProps) {
                   <h3>Commander</h3>
                   {lab.commanderEntry ? (
                     <div className="commander-card">
-                      <strong>{lab.commanderEntry.card.name}</strong>
-                      <span>{lab.commanderEntry.card.mana_cost}</span>
-                      <p>{lab.commanderEntry.card.type_line}</p>
+                      <div>
+                        <strong>{lab.commanderEntry.card.name}</strong> <ManaCost cost={lab.commanderEntry.card.mana_cost} />
+                        <p>{lab.commanderEntry.card.type_line}</p>
+                      </div>
                       <button onClick={lab.clearCommander} type="button">
-                        Clear commander
+                        Clear
                       </button>
                     </div>
                   ) : (
@@ -113,34 +119,49 @@ export function BuilderPage({ lab }: BuilderPageProps) {
               )}
 
               <div className="deck-list">
-                {lab.selectedDeck.cards.length === 0 && <p className="muted">No cards added yet.</p>}
-                {lab.selectedDeck.cards.map((entry) => (
-                  <div
-                    key={entry.card.id}
-                    className={`deck-card-row ${entry.is_commander ? "commander-highlight" : ""}`}
-                  >
-                    <div>
-                      <strong>
-                        {entry.quantity}x {entry.card.name}
-                      </strong>
-                      <p>{entry.card.type_line}</p>
-                    </div>
-
-                    <div className="deck-card-actions">
-                      {lab.isCommanderDeck && !entry.is_commander && (
-                        <button onClick={() => lab.setCardAsCommander(entry.card.id)} type="button">
-                          Set commander
-                        </button>
-                      )}
-
-                      {entry.is_commander && <span className="commander-badge">Commander</span>}
-
-                      <button onClick={() => lab.removeCardFromSelectedDeck(entry.card.id)} type="button">
-                        Remove
+                <CardTable
+                  empty={<p className="muted">No cards yet. Add some from Search or paste a decklist.</p>}
+                  rows={lab.selectedDeck.cards.map((entry) => ({
+                    key: entry.card.id,
+                    card: entry.card,
+                    quantity: entry.quantity,
+                    highlight: entry.is_commander,
+                    badge: entry.is_commander ? <span className="commander-badge">Commander</span> : undefined,
+                    rowActions: (
+                      <button
+                        className="icon-button"
+                        onClick={() => lab.removeCardFromSelectedDeck(entry.card.id)}
+                        type="button"
+                        title="Remove"
+                        aria-label={`Remove ${entry.card.name}`}
+                      >
+                        −
                       </button>
-                    </div>
-                  </div>
-                ))}
+                    ),
+                    detailActions: (
+                      <>
+                        {lab.isCommanderDeck && !entry.is_commander && (
+                          <button className="secondary-button" onClick={() => lab.setCardAsCommander(entry.card.id)} type="button">
+                            Set as commander
+                          </button>
+                        )}
+                        <button className="secondary-button" onClick={() => lab.removeCardFromSelectedDeck(entry.card.id)} type="button">
+                          Remove
+                        </button>
+                        <button
+                          className="text-link"
+                          onClick={() => {
+                            lab.findSimilarCards(entry.card);
+                            navigate("/search");
+                          }}
+                          type="button"
+                        >
+                          Find similar
+                        </button>
+                      </>
+                    ),
+                  }))}
+                />
               </div>
             </>
           )}
@@ -148,7 +169,7 @@ export function BuilderPage({ lab }: BuilderPageProps) {
       </section>
 
       <aside className="stack">
-        <SectionCard title="Import / Export" subtitle="Decklist workflow" defaultOpen={false}>
+        <SectionCard title="Import / export" defaultOpen={false}>
           <label className="field">
             <span>Paste decklist: Moxfield works best</span>
             <textarea
@@ -169,7 +190,7 @@ export function BuilderPage({ lab }: BuilderPageProps) {
 
           <div className="button-row">
             <button className="primary-button" onClick={lab.importDecklist} disabled={lab.decklistLoading} type="button">
-              {lab.decklistLoading ? "Working..." : "Import decklist"}
+              {lab.decklistLoading ? "Working…" : "Import decklist"}
             </button>
 
             <button className="secondary-button no-margin" onClick={lab.createDeckFromImport} disabled={lab.decklistLoading} type="button">

@@ -2,7 +2,7 @@
 
 A local development project for building, storing, searching, pricing, and analyzing Magic: The Gathering decks.
 
-The main AI feature is the **General Chat agent**. It runs a dynamic agentic loop: the LLM decides which tools to call, executes them against the local database, and keeps going until it has enough information to answer. It can look up your decks, search cards by name or concept, and find upgrade suggestions, all driven by the conversation instead of hardcoded triggers. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
+The main AI feature is the **General Chat agent**. It runs a dynamic agentic loop: the LLM decides which tools to call, executes them against the local database, and keeps going until it has enough information to answer. It can look up your decks, search cards by name or concept, find upgrade suggestions, and score a deck's power level and Commander bracket, all driven by the conversation instead of hardcoded triggers. Around that AI layer, the project also includes a normal card/deck database, semantic card search, Commander-focused deck tools, price refreshes, and a browser frontend.
 
 This is a hobby/development system, not a production-ready web app. It currently has no authentication, no user accounts, and no production migration setup.
 
@@ -23,6 +23,7 @@ It uses a dynamic tool-calling loop: the LLM reads the conversation, decides whi
 | `search_cards` | Filters the card database by name, oracle text, color identity, and mana value. |
 | `search_cards_semantic` | AI-powered semantic search via Qdrant, best for conceptual queries like "cheap green ramp" or "sacrifice outlets in black". |
 | `find_upgrades` | Suggests cards to add to a specific deck based on its themes and a stated goal. |
+| `get_power_level` | Scores a Commander deck on [edhpowerlevel.com](https://edhpowerlevel.com): power level, bracket, game changers, combos, mana odds, and optionally per-card impact. |
 
 It is intended for questions like:
 
@@ -32,6 +33,7 @@ It is intended for questions like:
 - "Give me ideas for a Commander deck around this theme."
 - "Analyze these decks and compare their game plans."
 - "Find me some cheap blue card draw spells."
+- "What bracket is my Atraxa deck, and which game changers is it running?"
 
 The `include_deck_context` flag preloads a summary of your saved decks into the system prompt. The LLM can then call `get_deck_details` for any deck it wants to inspect in full.
 
@@ -40,9 +42,11 @@ The `include_deck_context` flag preloads a summary of your saved decks into the 
 The rest of the app supports the AI/chat workflow and is useful on its own:
 
 - Search MTG cards by name, text, color identity, and mana value.
-- Run semantic card search through Qdrant vector search.
+- Run semantic card search through Qdrant vector search, optionally filtered by card type (e.g. only creatures, or no lands).
 - Store cards and decks in PostgreSQL.
 - Create, list, inspect, import, export, and modify decks.
+- Resolve unknown names during decklist import through Scryfall (alternate/Universes Beyond printed names and minor typos).
+- Score Commander decks for power level and bracket via edhpowerlevel.com (headless browser, cached locally).
 - Mark and clear a Commander for Commander decks.
 - Check basic Commander/deck-building rules.
 - Generate deterministic deck analysis, diagnosis, and card suggestions.
@@ -52,7 +56,7 @@ The rest of the app supports the AI/chat workflow and is useful on its own:
 
 ### Note about deck coaching
 
-Deck coaching is **not the main AI feature**. In the current setup, the deck coaching flow is mostly deterministic: it runs analysis, rules checks, diagnosis logic, semantic suggestions, and then builds a structured report.
+Deck coaching is **not the main AI feature**. In the current setup, the deck coaching flow is mostly deterministic: it runs analysis, rules checks, diagnosis logic, power-level scoring, semantic suggestions, and then builds a structured report.
 
 There is an optional LLM enhancement path in the code, but it is disabled by default and should be treated as secondary. The main intended AI interaction is still **General Chat**.
 
@@ -66,6 +70,7 @@ There is an optional LLM enhancement path in the code, but it is disabled by def
 - **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2` by default
 - **Card data:** MTGJSON `AtomicCards.json`
 - **Price data:** Scryfall bulk/default card data
+- **Power level data:** edhpowerlevel.com, scraped with Playwright + headless Chromium
 - **Containers:** Docker Compose
 - **LLM integration:** OpenAI and OpenAI-compatible APIs; requires tool/function calling support
 
@@ -89,14 +94,17 @@ The exact structure may change as the project develops, but the current project 
 │   │   │   ├── decks.py               # Deck CRUD, import/export, analysis, rules, suggestions
 │   │   │   ├── prices.py              # Price status, refresh, card/deck price lookup
 │   │   │   └── agent.py               # General Chat and deck-coach endpoints
-│   │   ├── services/                  # Deterministic deck, theme, price, and business logic
+│   │   ├── services/                  # Deterministic deck, theme, price, power-level, and business logic
+│   │   │   ├── edh_powerlevel_service.py  # Playwright scraper for edhpowerlevel.com (also a CLI)
+│   │   │   └── power_score_service.py     # Turns deck rows into a decklist and scores it
 │   │   ├── agents/                    # General Chat agentic loop and deck-coach graph/tool orchestration
+│   │   │   └── tool_log.py            # Trace log of agent runs and tool calls
 │   │   ├── llm/                       # LLM provider abstraction, tool-calling interface, and prompts
 │   │   └── core/                      # App settings/config
 │   ├── .env.example                   # Runtime/LLM configuration template
 │   └── Dockerfile
 ├── frontend/                          # Browser UI
-├── data/                              # Local data mount; put AtomicCards.json here
+├── data/                              # Local data mount (gitignored): AtomicCards.json, power-level cache, agent tool log
 ├── docker-compose.yml                 # PostgreSQL + Qdrant + API + frontend
 └── README.md
 ```
@@ -108,6 +116,8 @@ The project uses public MTG data sources:
 - [MTGJSON](https://mtgjson.com/) for card data.
 - [Scryfall API/card data](https://scryfall.com/docs/api/cards) for price-related card data.
 - [Scryfall price FAQ](https://scryfall.com/docs/faqs/where-do-scryfall-prices-come-from-7) for context on where Scryfall prices come from.
+- [Scryfall `/cards/named`](https://scryfall.com/docs/api/cards/named) for resolving unknown card names during decklist import (rate-limited to ~10 requests/second, results cached in memory).
+- [edhpowerlevel.com](https://edhpowerlevel.com) for Commander power level and bracket scoring. The site does all scoring client-side, so the API drives a headless Chromium to read the results.
 
 For setup, the most important file is:
 
@@ -208,6 +218,8 @@ The code has some provider hooks for local/Ollama-style usage, but the current s
 docker compose up --build
 ```
 
+The first build takes a while longer than you might expect: the API image installs Playwright's headless Chromium and its system libraries (used for power-level scoring). If you pulled these changes into an existing checkout, rebuild with `--build` so the browser gets installed.
+
 This starts the full local development stack:
 
 | Service | Purpose | Default local URL |
@@ -278,7 +290,7 @@ Semantic search, after Qdrant has been indexed:
 ```bash
 curl -X POST "http://localhost:8000/cards/semantic-search" \
   -H "Content-Type: application/json" \
-  -d '{"query":"cheap ramp for commander","limit":10}'
+  -d '{"query":"cheap ramp for commander","limit":10,"exclude_types":["Land"]}'
 ```
 
 General Chat, after an LLM provider is configured:
@@ -387,7 +399,54 @@ Customize this if you want to change:
 - What text is embedded for each card.
 - Indexing batch size.
 
+- Which card types the type filter recognizes (`CARD_TYPES`).
+
 If you change the embedding model, make sure the configured vector size matches the model output dimension, then rebuild the Qdrant collection/index.
+
+### Power level scoring
+
+Relevant files:
+
+```text
+api/app/services/edh_powerlevel_service.py
+api/app/services/power_score_service.py
+```
+
+Power level comes from [edhpowerlevel.com](https://edhpowerlevel.com). The site computes everything in the browser, so the service encodes the decklist into the site's `?d=` URL, loads it in headless Chromium, waits until the numbers stop changing, and parses the result. Results are cached on disk, keyed by the normalized decklist.
+
+Environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EDHPL_CACHE_DIR` | `data/edhpowerlevel_cache` | Where scored decklists are cached. |
+| `EDHPL_CACHE_TTL_SECONDS` | `604800` (7 days) | How long a cached score stays valid. |
+| `EDHPL_MAX_CONCURRENT_PAGES` | `2` | Parallel page loads against the site. |
+
+The scraper can also be run on its own for debugging (from the `api` directory, or inside the API container):
+
+```bash
+python -m app.services.edh_powerlevel_service deck.txt
+python -m app.services.edh_powerlevel_service deck.txt --no-cache --headful --cards
+python -m app.services.edh_powerlevel_service deck.txt --url-only
+```
+
+The decklist should be in Moxfield export format with the commander(s) in a trailing `COMMANDER` section.
+
+This depends on the third-party site's page layout. If the site changes, scoring fails gracefully (the deck coach and chat report the error instead of crashing), but the parsing in `edh_powerlevel_service.py` will need updating.
+
+### Agent tool log
+
+Relevant file:
+
+```text
+api/app/agents/tool_log.py
+```
+
+Every General Chat / Deck Coach run and every tool call (with its arguments) is printed to stdout and appended to `data/agent_tool_log.txt` (`/data/agent_tool_log.txt` in Docker). Set `AGENT_TOOL_LOG_FILE` to change the path, or to an empty string to disable file logging. Useful for seeing what the agent actually decided to do:
+
+```bash
+docker compose logs -f api
+```
 
 ### Price behavior
 
@@ -470,9 +529,13 @@ Example semantic-search body:
   "query": "lifegain payoff for commander",
   "limit": 10,
   "color": "W",
-  "max_mana_value": 5
+  "max_mana_value": 5,
+  "include_types": ["Creature", "Enchantment"],
+  "exclude_types": ["Land"]
 }
 ```
+
+`include_types` keeps cards that have **any** of the listed types; `exclude_types` drops cards that have any of them (so excluding `Creature` also drops artifact creatures). Recognized types are Artifact, Battle, Creature, Enchantment, Instant, Land, Planeswalker, and Sorcery; anything else is ignored. The filter runs inside Qdrant, so excluding a common type doesn't shrink the result pool.
 
 ### Decks
 
@@ -491,6 +554,21 @@ Example semantic-search body:
 | `DELETE` | `/decks/{deck_id}/commander` | Clear the current commander. |
 | `GET` | `/decks/{deck_id}/rules-check` | Check basic deck/Commander rules. |
 | `GET` | `/decks/{deck_id}/diagnosis` | Get a deterministic deck diagnosis. |
+
+#### Decklist import
+
+Example import body:
+
+```json
+{
+  "decklist": "1 Sol Ring\n1 Arcane Signet\n1 Golbez, Clad in Darkness",
+  "replace_existing": false,
+  "assign_first_card_as_commander": true
+}
+```
+
+- Names not found in the local database are looked up on Scryfall (exact, then fuzzy) and mapped to their Oracle name. This covers Universes Beyond / Secret Lair printed names (e.g. "Golbez, Clad in Darkness" → "Syr Konrad, the Grim") and small typos. Those entries come back with a `resolved_from` field, and the response includes a `resolved_count`.
+- `assign_first_card_as_commander` marks the first card as commander for Commander decks. Moxfield exports are still detected automatically.
 
 ### Prices
 
@@ -523,6 +601,7 @@ The LLM reads the conversation, calls tools as needed, and loops until it has en
 | `search_cards` | User wants to look up cards by name, text, or filter. |
 | `search_cards_semantic` | User describes cards conceptually ("cheap green ramp", "sacrifice outlets"). |
 | `find_upgrades` | User asks what to add to a deck or how to improve it. |
+| `get_power_level` | User asks how strong a deck is, what bracket it belongs in, or about game changers/combos. Per-card impact scores are only included when asked for. |
 
 Example request body:
 
@@ -549,10 +628,13 @@ Runs a fixed LangGraph pipeline, not a dynamic loop. Each step runs in order:
 2. **Analyze**: mana curve, card type distribution, color identity breakdown.
 3. **Rules check**: format legality, commander color identity, singleton violations, card count.
 4. **Diagnose**: detects weaknesses like low ramp, low card draw, insufficient removal, high mana curve, etc.
-5. **Choose goal**: resolves the coaching focus from the `goal` field (or uses a default).
-6. **Suggest cards**: semantic vector search for cards that fit the deck's themes and goal.
-7. **Build report**: assembles a deterministic Markdown report from all of the above.
-8. **Enhance with LLM** *(optional, off by default)*: rewrites the report using the configured LLM if `LLM_ENABLE_DECK_COACH=true`.
+5. **Score power level**: power level, bracket, game changers, combos, and mana screw/flood odds from edhpowerlevel.com. If scoring fails, the report notes it and the pipeline continues.
+6. **Choose goal**: resolves the coaching focus from the `goal` field (or uses a default).
+7. **Suggest cards**: semantic vector search for cards that fit the deck's themes and goal.
+8. **Build report**: assembles a deterministic Markdown report from all of the above, including a "Power Level" section.
+9. **Enhance with LLM** *(optional, off by default)*: rewrites the report using the configured LLM if `LLM_ENABLE_DECK_COACH=true`.
+
+The response also includes the raw `power_score` object alongside the other tool payloads.
 
 Example request body:
 
@@ -758,6 +840,21 @@ curl -X POST "http://localhost:8000/prices/refresh?force=true"
 
 Some cards or printings may still have missing prices depending on the Scryfall data available.
 
+### Power level is unavailable
+
+The deck coach report shows "Could not get a power level from edhpowerlevel.com: ..." or the chat agent says it couldn't score the deck. Common causes:
+
+- **Chromium is missing.** The API image was built before Playwright was added. Rebuild with `docker compose up --build`.
+- **The site is down or slow.** Page loads time out after 45 seconds. Try again later, or run the CLI with `--headful` (outside Docker) to watch what happens.
+- **The site changed its layout.** The parser in `edh_powerlevel_service.py` needs updating.
+- **The deck has no commander set.** The score will be less meaningful; mark a commander first.
+
+The first score for a decklist takes several seconds. Repeat calls are served from `data/edhpowerlevel_cache` until the cache expires or the decklist changes.
+
+### Imported card names don't match
+
+Unknown names are resolved through Scryfall. If Scryfall can't be reached, those cards are reported as unmatched instead. Re-import once you're back online. Network failures aren't cached, so retrying works.
+
 ### Deck themes look overstated
 
 Theme detection currently uses simple heuristics over card text. If a card mentions "graveyard" or "sacrifice," the system may count that as a theme even when it is not central to the deck.
@@ -771,4 +868,5 @@ The relevant logic lives in the deck service, especially role/theme detection an
 - General Chat is the main AI interface.
 - Deck coaching is primarily deterministic unless optional LLM enhancement is explicitly enabled.
 - Price values are imported snapshots, not guaranteed real-time market prices.
+- Power level and bracket come from a third-party site (edhpowerlevel.com) and depend on its scoring and page layout.
 - For serious schema changes, adding Alembic or another migration tool would be a good future improvement.

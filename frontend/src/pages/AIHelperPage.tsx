@@ -1,4 +1,6 @@
+import { useNavigate } from "react-router-dom";
 import type { DeckLabState } from "../hooks/useDeckLab";
+import { CardTable } from "../components/ui/CardTable";
 import { CoachReport } from "../components/ui/CoachReport";
 import { SectionCard } from "../components/ui/SectionCard";
 
@@ -7,6 +9,8 @@ type AIHelperPageProps = {
 };
 
 export function AIHelperPage({ lab }: AIHelperPageProps) {
+  const navigate = useNavigate();
+
   const helperIgnoreOptions = Array.from(
     new Set([
       "ramp",
@@ -39,17 +43,17 @@ export function AIHelperPage({ lab }: AIHelperPageProps) {
 
   return (
     <div className="stack">
-      <SectionCard title="Semantic Helper" subtitle="Open-ended deck coaching and recommendations">
+      <SectionCard title="Deck coach" subtitle={lab.selectedDeck?.name}>
         {!lab.selectedDeck && (
-          <p className="muted">Select or create a deck first, then ask for coaching help.</p>
+          <p className="muted">Pick a deck in the top bar first.</p>
         )}
 
         <label className="field">
-          <span>What should the helper focus on? (optional)</span>
+          <span>What should the coach focus on? (optional)</span>
           <textarea
             value={lab.coachGoal}
             onChange={(event) => lab.setCoachGoal(event.target.value)}
-            placeholder="Example: Help me make this deck faster against aggressive pods"
+            placeholder="Make this deck faster against aggressive pods"
           />
         </label>
 
@@ -64,10 +68,7 @@ export function AIHelperPage({ lab }: AIHelperPageProps) {
         </label>
 
         <div className="field">
-          <span>Ignore status categories (optional)</span>
-          <p className="muted helper-note">
-            Suppress repeated coaching advice for categories you do not want to optimize right now.
-          </p>
+          <span>Skip advice about (optional)</span>
           <div className="ignore-chip-grid">
             {helperIgnoreOptions.map((category) => {
               const normalized = category.trim().toLowerCase();
@@ -88,7 +89,7 @@ export function AIHelperPage({ lab }: AIHelperPageProps) {
         </div>
 
         <button className="primary-button" onClick={lab.runDeckCoach} disabled={lab.coachLoading} type="button">
-          {lab.coachLoading ? "Thinking..." : "Ask semantic helper"}
+          {lab.coachLoading ? "Thinking…" : "Review my deck"}
         </button>
 
         {lab.coachGoalUsed && (
@@ -115,30 +116,36 @@ export function AIHelperPage({ lab }: AIHelperPageProps) {
         {lab.coachSuggestions.length > 0 && (
           <div className="coach-suggestions">
             <h3>Suggested cards</h3>
-            <div className="suggestion-list">
-              {lab.coachSuggestions.map((suggestion) => (
-                <article key={suggestion.card.id} className="suggestion-card">
-                  <div className="suggestion-header">
-                    <div>
-                      <strong>{suggestion.card.name}</strong>
-                      <p>{suggestion.card.type_line}</p>
-                    </div>
-                    <span>{suggestion.card.mana_cost}</span>
-                  </div>
-
-                  {suggestion.card.oracle_text && <p className="suggestion-text">{suggestion.card.oracle_text}</p>}
-
-                  <div className="metadata">
-                    <span>MV: {suggestion.card.mana_value ?? "-"}</span>
-                    <span>Score: {suggestion.score !== undefined ? suggestion.score.toFixed(3) : "-"}</span>
-                  </div>
-
-                  <button className="secondary-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button">
-                    Add suggestion
+            <CardTable
+              showScore
+              rows={lab.coachSuggestions.map((suggestion) => ({
+                key: suggestion.card.id,
+                card: suggestion.card,
+                score: suggestion.score,
+                rowActions: (
+                  <button className="icon-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button" title="Add to deck" aria-label={`Add ${suggestion.card.name} to deck`}>
+                    +
                   </button>
-                </article>
-              ))}
-            </div>
+                ),
+                detailActions: (
+                  <>
+                    <button className="primary-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button">
+                      Add to deck
+                    </button>
+                    <button
+                      className="text-link"
+                      onClick={() => {
+                        lab.findSimilarCards(suggestion.card);
+                        navigate("/search");
+                      }}
+                      type="button"
+                    >
+                      Find similar
+                    </button>
+                  </>
+                ),
+              }))}
+            />
           </div>
         )}
       </SectionCard>

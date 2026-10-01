@@ -160,8 +160,7 @@ export function GeneralChatPage({ lab }: GeneralChatPageProps) {
   return (
     <div className="stack">
       <SectionCard
-        title="General Chat"
-        subtitle="Discuss MTG freely. Decks are not used unless you explicitly enable context."
+        title="Chat"
         actions={
           <button className="secondary-button no-margin" onClick={clearChat} type="button" disabled={loading}>
             Clear chat
@@ -208,7 +207,7 @@ export function GeneralChatPage({ lab }: GeneralChatPageProps) {
         <div className="chat-thread" role="log" aria-live="polite">
           {messages.length === 0 && (
             <p className="muted">
-              Start a conversation about deck ideas, rules interactions, formats, archetypes, mulligans, sideboarding, or card evaluations.
+              Ask about rules interactions, archetypes, mulligans, card evaluations — anything Magic.
             </p>
           )}
 
@@ -231,7 +230,7 @@ export function GeneralChatPage({ lab }: GeneralChatPageProps) {
           {loading && (
             <article className="chat-message chat-message-assistant">
               <header>Assistant</header>
-              <p>Thinking...</p>
+              <p>Thinking…</p>
             </article>
           )}
         </div>
@@ -250,7 +249,7 @@ export function GeneralChatPage({ lab }: GeneralChatPageProps) {
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Ask anything MTG-related..."
+            placeholder="Does Blood Artist trigger if it dies at the same time as my other creatures?"
           />
         </label>
 

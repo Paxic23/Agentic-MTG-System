@@ -6,26 +6,35 @@ type AppShellProps = {
   lab: DeckLabState;
 };
 
+const NAV_ITEMS = [
+  { to: "/search", label: "Search" },
+  { to: "/builder", label: "Builder" },
+  { to: "/insights", label: "Insights" },
+  { to: "/ai-helper", label: "Coach" },
+  { to: "/chat", label: "Chat" },
+];
+
 export function AppShell({ lab }: AppShellProps) {
   const { mode, toggleMode } = useTheme();
 
   return (
-    <div className="app-shell">
-      <div className="background-layers" aria-hidden="true">
-        <div className="bg-shape bg-shape-a" />
-        <div className="bg-shape bg-shape-b" />
-      </div>
-
+    <>
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Agentic MTG System</p>
-          <h1>Deck Lab</h1>
-        </div>
+        <div className="topbar-inner">
+          <span className="wordmark">decklab</span>
 
-        <div className="topbar-actions">
-          <label className="deck-picker">
-            <span>Active deck</span>
+          <nav className="route-nav">
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? "active" : "")}>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="topbar-actions">
             <select
+              className="deck-picker"
+              aria-label="Active deck"
               value={lab.selectedDeckId}
               onChange={(event) => lab.setSelectedDeckId(event.target.value)}
             >
@@ -36,34 +45,34 @@ export function AppShell({ lab }: AppShellProps) {
                 </option>
               ))}
             </select>
-          </label>
 
-          <button className="theme-toggle" onClick={toggleMode} type="button">
-            {mode === "dark" ? "Switch to light" : "Switch to dark"}
-          </button>
+            <button
+              className="theme-toggle"
+              onClick={toggleMode}
+              type="button"
+              aria-label={mode === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              title={mode === "dark" ? "Light theme" : "Dark theme"}
+            >
+              {mode === "dark" ? "☀" : "☾"}
+            </button>
+          </div>
         </div>
       </header>
 
-      <nav className="route-nav">
-        <NavLink to="/search" className={({ isActive }) => (isActive ? "active" : "")}>Search</NavLink>
-        <NavLink to="/builder" className={({ isActive }) => (isActive ? "active" : "")}>Builder</NavLink>
-        <NavLink to="/insights" className={({ isActive }) => (isActive ? "active" : "")}>Insights</NavLink>
-        <NavLink to="/ai-helper" className={({ isActive }) => (isActive ? "active" : "")}>Semantic Helper</NavLink>
-        <NavLink to="/chat" className={({ isActive }) => (isActive ? "active" : "")}>General Chat</NavLink>
-      </nav>
+      <div className="app-shell">
+        {lab.error && (
+          <div className="global-error" role="alert">
+            <p>{lab.error}</p>
+            <button onClick={lab.clearError} type="button">
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      {lab.error && (
-        <div className="global-error" role="alert">
-          <p>{lab.error}</p>
-          <button onClick={lab.clearError} type="button">
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      <main className="content-area">
-        <Outlet />
-      </main>
-    </div>
+        <main className="content-area">
+          <Outlet />
+        </main>
+      </div>
+    </>
   );
 }

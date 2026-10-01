@@ -16,13 +16,11 @@ def build_deck_coach_prompts(
     diagnosis: dict[str, Any],
     suggestions_response: dict[str, Any],
     ignored_categories: list[str],
-    deterministic_report: str,
 ) -> tuple[str, str]:
     system_prompt = (
         "You are an expert on Magic: The Gathering. "
         "Give practical advice for Commander. "
         "Never invent card data not present in the supplied tool outputs. "
-        #"Prefer clear reasoning, realistic caveats, and concrete next steps. "
         "Do not overstate deck themes: if diagnosis.theme_profile marks a role as minor, "
         "treat it as incidental support, not as a central deck identity."
     )
@@ -57,10 +55,6 @@ Diagnosis tool output:
 
 Suggestions tool output:
 {_compact_json(suggestions_response)}
-
 """.strip()
 
     return system_prompt, user_prompt
-
-#- Only describe core/supporting roles as real deck themes.
-#Deterministic baseline report (optional context, do not feel forced to mirror its structure): {deterministic_report}

@@ -10,13 +10,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "postgresql+psycopg2://mtg:mtg@db:5432/mtg"
-
-    qdrant_url: str = "http://qdrant:6333"
-    qdrant_collection_name: str = "mtg_cards"
-    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_vector_size: int = 384
-
     llm_provider: str = "none"
     llm_enable_deck_coach: bool = False
     llm_model: str = ""

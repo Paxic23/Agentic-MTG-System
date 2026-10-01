@@ -6,13 +6,15 @@ type InsightsPageProps = {
 };
 
 export function InsightsPage({ lab }: InsightsPageProps) {
+  const curveMax = Math.max(1, ...Object.values(lab.deckAnalysis?.mana_curve ?? {}));
+
   return (
     <div className="stack">
         <SectionCard
           title="Deck health"
-          subtitle={lab.deckHealthLoading ? "Refreshing checks..." : "Rules and structural diagnostics"}
+          subtitle={lab.deckHealthLoading ? "Refreshing…" : lab.selectedDeck?.name}
         >
-          {!lab.selectedDeck && <p className="muted">Select a deck to see health insights.</p>}
+          {!lab.selectedDeck && <p className="muted">Pick a deck in the top bar to see its health.</p>}
 
           {lab.rulesCheck && (
             <div className={`rules-status ${lab.rulesCheck.is_valid ? "valid" : "invalid"}`}>
@@ -75,7 +77,7 @@ export function InsightsPage({ lab }: InsightsPageProps) {
         </SectionCard>
 
         {lab.deckAnalysis && (
-          <SectionCard title="Mana and composition" subtitle="Curve, types, and colors" defaultOpen={false}>
+          <SectionCard title="Curve and composition" defaultOpen={false}>
             <div className="analysis-grid">
               <div>
                 <span>Total cards</span>
@@ -101,7 +103,7 @@ export function InsightsPage({ lab }: InsightsPageProps) {
                 <div key={bucket} className="mini-bar-row">
                   <span>{bucket}</span>
                   <div>
-                    <div style={{ width: `${Math.max(count * 18, 8)}px` }} />
+                    <div style={{ width: `${(count / curveMax) * 100}%` }} />
                   </div>
                   <strong>{count}</strong>
                 </div>

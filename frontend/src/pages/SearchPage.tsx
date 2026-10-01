@@ -1,4 +1,5 @@
 import { CARD_TYPES, type DeckLabState } from "../hooks/useDeckLab";
+import { CardTable } from "../components/ui/CardTable";
 import { SectionCard } from "../components/ui/SectionCard";
 
 type SearchPageProps = {
@@ -9,29 +10,32 @@ export function SearchPage({ lab }: SearchPageProps) {
   return (
     <div className="page-grid page-grid-search">
       <section className="stack">
-        <SectionCard title="Card search" subtitle="Exact or semantic card discovery">
-          <div className="mode-toggle">
-            <button
-              className={lab.mode === "exact" ? "active" : ""}
-              onClick={() => {
-                lab.setMode("exact");
-              }}
-              type="button"
-            >
-              Exact search
-            </button>
+        <SectionCard
+          title="Search"
+          actions={
+            <div className="mode-toggle">
+              <button
+                className={lab.mode === "exact" ? "active" : ""}
+                onClick={() => {
+                  lab.setMode("exact");
+                }}
+                type="button"
+              >
+                Exact
+              </button>
 
-            <button
-              className={lab.mode === "semantic" ? "active" : ""}
-              onClick={() => {
-                lab.setMode("semantic");
-              }}
-              type="button"
-            >
-              Semantic search
-            </button>
-          </div>
-
+              <button
+                className={lab.mode === "semantic" ? "active" : ""}
+                onClick={() => {
+                  lab.setMode("semantic");
+                }}
+                type="button"
+              >
+                Semantic
+              </button>
+            </div>
+          }
+        >
           <div className="search-grid">
             {lab.mode === "exact" && (
               <>
@@ -89,7 +93,7 @@ export function SearchPage({ lab }: SearchPageProps) {
             </label>
 
             <button onClick={lab.handleSearch} disabled={lab.loading} type="button">
-              {lab.loading ? "Searching..." : "Search cards"}
+              {lab.loading ? "Searching…" : "Search"}
             </button>
           </div>
 
@@ -152,49 +156,42 @@ export function SearchPage({ lab }: SearchPageProps) {
           )}
         </SectionCard>
 
-        <SectionCard title="Search results" subtitle={`${lab.cards.length} cards shown`}>
-          <div className="results">
-            {lab.cards.length === 0 && <p className="muted">No cards yet. Run a search to populate this list.</p>}
-
-            {lab.cards.map((card) => (
-              <article key={card.id} className="card-item">
-                <div className="card-item-header">
-                  <div>
-                    <h3>{card.name}</h3>
-                    {card.score !== undefined && (
-                      <p className="score">Similarity score: {card.score.toFixed(3)}</p>
-                    )}
-                  </div>
-
-                  <span>{card.mana_cost}</span>
-                </div>
-
-                <p className="type-line">{card.type_line}</p>
-                {card.oracle_text && <p className="oracle-text">{card.oracle_text}</p>}
-
-                <div className="metadata">
-                  <span>MV: {card.mana_value ?? "-"}</span>
-                  <span>Color identity: {card.color_identity?.join(", ") || "Colorless"}</span>
-                  {card.keywords && card.keywords.length > 0 && <span>Keywords: {card.keywords.join(", ")}</span>}
-                </div>
-
-                <button className="secondary-button" onClick={() => lab.addCardToSelectedDeck(card.id)} type="button">
-                  Add to selected deck
+        <SectionCard title="Results" subtitle={lab.cards.length > 0 ? `${lab.cards.length} cards` : undefined}>
+          <CardTable
+            showScore={lab.cards.some((card) => card.score !== undefined)}
+            empty={<p className="muted">Nothing here yet. Try a card name, or switch to semantic and describe what you need.</p>}
+            rows={lab.cards.map((card) => ({
+              key: card.id,
+              card,
+              score: card.score,
+              rowActions: (
+                <button className="icon-button" onClick={() => lab.addCardToSelectedDeck(card.id)} type="button" title="Add to deck" aria-label={`Add ${card.name} to deck`}>
+                  +
                 </button>
-              </article>
-            ))}
-          </div>
+              ),
+              detailActions: (
+                <>
+                  <button className="primary-button" onClick={() => lab.addCardToSelectedDeck(card.id)} type="button">
+                    {lab.selectedDeck ? `Add to ${lab.selectedDeck.name}` : "Add to deck"}
+                  </button>
+                  <button className="text-link" onClick={() => lab.findSimilarCards(card)} type="button">
+                    Find similar
+                  </button>
+                </>
+              ),
+            }))}
+          />
         </SectionCard>
       </section>
 
       <aside className="stack">
-        <SectionCard title="Suggestions" subtitle="Context-aware card recommendations" defaultOpen={false}>
+        <SectionCard title="Ideas for this deck" defaultOpen={false}>
           <label className="field">
             <span>Goal (optional)</span>
             <textarea
               value={lab.suggestionGoal}
               onChange={(event) => lab.setSuggestionGoal(event.target.value)}
-              placeholder="Example: protection for a creature-heavy strategy"
+              placeholder="protection for a creature-heavy strategy"
             />
           </label>
 
@@ -209,30 +206,31 @@ export function SearchPage({ lab }: SearchPageProps) {
           </label>
 
           <button className="primary-button" onClick={lab.loadDeckSuggestions} disabled={lab.suggestionsLoading} type="button">
-            {lab.suggestionsLoading ? "Finding..." : "Get suggestions"}
+            {lab.suggestionsLoading ? "Looking…" : "Suggest cards"}
           </button>
 
-          <div className="suggestion-list compact">
-            {lab.suggestions.map((suggestion) => (
-              <article key={suggestion.card.id} className="suggestion-card">
-                <div className="suggestion-header">
-                  <strong>{suggestion.card.name}</strong>
-                  <span>{suggestion.card.mana_cost}</span>
-                </div>
-
-                <p>{suggestion.reason}</p>
-
-                <div className="metadata">
-                  <span>Score: {suggestion.score.toFixed(3)}</span>
-                  <span>MV: {suggestion.card.mana_value ?? "-"}</span>
-                </div>
-
-                <button className="secondary-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button">
-                  Add suggestion
-                </button>
-              </article>
-            ))}
-          </div>
+          {lab.suggestions.length > 0 && (
+            <div className="suggestion-list">
+              <CardTable
+                showType={false}
+                rows={lab.suggestions.map((suggestion) => ({
+                  key: suggestion.card.id,
+                  card: suggestion.card,
+                  note: suggestion.reason,
+                  rowActions: (
+                    <button className="icon-button" onClick={() => lab.addCardToSelectedDeck(suggestion.card.id)} type="button" title="Add to deck" aria-label={`Add ${suggestion.card.name} to deck`}>
+                      +
+                    </button>
+                  ),
+                  detailActions: (
+                    <button className="text-link" onClick={() => lab.findSimilarCards(suggestion.card)} type="button">
+                      Find similar
+                    </button>
+                  ),
+                }))}
+              />
+            </div>
+          )}
         </SectionCard>
       </aside>
     </div>

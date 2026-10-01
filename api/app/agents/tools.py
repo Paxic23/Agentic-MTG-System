@@ -150,7 +150,6 @@ def run_llm_report_enhancement_tool(
             diagnosis=diagnosis,
             suggestions_response=suggestions_response,
             ignored_categories=ignored_categories,
-            deterministic_report=deterministic_report,
         )
 
         completion = llm_client.complete(

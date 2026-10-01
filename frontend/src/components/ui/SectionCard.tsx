@@ -18,7 +18,7 @@ export function SectionCard({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="section-card">
+    <section className={`section-card ${open ? "" : "collapsed"}`}>
       <header className="section-header">
         <button
           className="section-toggle"
@@ -26,6 +26,7 @@ export function SectionCard({
           aria-expanded={open}
           type="button"
         >
+          <span className="chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
           <span className="section-title">{title}</span>
           {subtitle && <span className="section-subtitle">{subtitle}</span>}
         </button>

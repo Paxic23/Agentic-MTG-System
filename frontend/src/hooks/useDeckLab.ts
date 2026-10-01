@@ -226,11 +226,12 @@ export function useDeckLab() {
     }
   }
 
-  async function searchSemanticCards() {
+  async function searchSemanticCards(queryOverride?: string) {
     setLoading(true);
     setError("");
 
-    if (!semanticQuery.trim()) {
+    const query = queryOverride ?? semanticQuery;
+    if (!query.trim()) {
       setError("Semantic search needs a description");
       setLoading(false);
       return;
@@ -238,7 +239,7 @@ export function useDeckLab() {
 
     try {
       const data = await semanticSearchCards({
-        query: semanticQuery,
+        query,
         color,
         maxManaValue,
         limit: 25,
@@ -261,6 +262,14 @@ export function useDeckLab() {
     }
 
     void searchSemanticCards();
+  }
+
+  // Runs a semantic search seeded with an existing card's rules text.
+  function findSimilarCards(card: Card) {
+    const query = card.oracle_text?.trim() || [card.name, card.type_line].filter(Boolean).join(" ");
+    setMode("semantic");
+    setSemanticQuery(query);
+    void searchSemanticCards(query);
   }
 
   async function loadDeckSuggestions() {
@@ -584,6 +593,7 @@ export function useDeckLab() {
       coachLoading,
       createDeck,
       handleSearch,
+      findSimilarCards,
       loadDeckSuggestions,
       addCardToSelectedDeck,
       removeCardFromSelectedDeck,
