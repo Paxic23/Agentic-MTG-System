@@ -1,4 +1,4 @@
-import type { DeckLabState } from "../hooks/useDeckLab";
+import { CARD_TYPES, type DeckLabState } from "../hooks/useDeckLab";
 import { SectionCard } from "../components/ui/SectionCard";
 
 type SearchPageProps = {
@@ -92,6 +92,40 @@ export function SearchPage({ lab }: SearchPageProps) {
               {lab.loading ? "Searching..." : "Search cards"}
             </button>
           </div>
+
+          {lab.mode === "semantic" && (
+            <div className="type-filter">
+              <div className="type-filter-header">
+                <span>Card types</span>
+                <small className="muted">Click once to include, twice to exclude, again to reset.</small>
+                {Object.keys(lab.typeFilters).length > 0 && (
+                  <button type="button" className="type-filter-clear" onClick={() => lab.setTypeFilters({})}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="ignore-chip-grid">
+                {CARD_TYPES.map((cardType) => {
+                  const state = lab.typeFilters[cardType];
+                  return (
+                    <button
+                      key={cardType}
+                      type="button"
+                      className={`ignore-chip type-chip ${state === "include" ? "active" : ""} ${
+                        state === "exclude" ? "excluded" : ""
+                      }`}
+                      aria-pressed={Boolean(state)}
+                      title={state ? `${cardType}: ${state}d` : `${cardType}: any`}
+                      onClick={() => lab.cycleTypeFilter(cardType)}
+                    >
+                      {state === "include" ? "+ " : state === "exclude" ? "− " : ""}
+                      {cardType}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {lab.mode === "semantic" && (
             <div className="chip-row">

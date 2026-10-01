@@ -80,6 +80,8 @@ export async function semanticSearchCards(payload: {
   color?: string;
   maxManaValue?: string;
   limit?: number;
+  includeTypes?: string[];
+  excludeTypes?: string[];
 }): Promise<Card[]> {
   const response = await fetch(`${API_URL}/cards/semantic-search`, {
     method: "POST",
@@ -91,6 +93,8 @@ export async function semanticSearchCards(payload: {
       limit: payload.limit ?? 25,
       color: payload.color || null,
       max_mana_value: payload.maxManaValue ? Number(payload.maxManaValue) : null,
+      include_types: payload.includeTypes ?? [],
+      exclude_types: payload.excludeTypes ?? [],
     }),
   });
 
@@ -152,6 +156,7 @@ export async function importDecklist(payload: {
   deckId: string;
   decklist: string;
   replaceExisting: boolean;
+  assignFirstCardAsCommander?: boolean;
 }): Promise<DeckImportResult> {
   const response = await fetch(`${API_URL}/decks/${payload.deckId}/import`, {
     method: "POST",
@@ -161,6 +166,7 @@ export async function importDecklist(payload: {
     body: JSON.stringify({
       decklist: payload.decklist,
       replace_existing: payload.replaceExisting,
+      assign_first_card_as_commander: payload.assignFirstCardAsCommander ?? false,
     }),
   });
 

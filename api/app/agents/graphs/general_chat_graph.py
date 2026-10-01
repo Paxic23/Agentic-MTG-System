@@ -5,6 +5,7 @@ from langgraph.graph import END, START, StateGraph
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.tool_log import log_tool_used
 from app.core.config import get_settings
 from app.llm.client import ToolCall
 from app.llm.factory import get_llm_client
@@ -16,6 +17,7 @@ from app.services.deck_service import (
     serialize_deck,
     suggest_cards_for_deck,
 )
+from app.services.power_score_service import score_power_level
 from app.vector import ensure_collection, semantic_search_cards
 
 
@@ -150,6 +152,37 @@ CHAT_TOOLS = [
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of suggestions. Defaults to 10.",
+                    },
+                },
+                "required": ["deck_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_power_level",
+            "description": (
+                "Get a Commander deck's power level and bracket from edhpowerlevel.com: "
+                "power level (0-10), Commander bracket (minimum and recommended), tipping point, "
+                "efficiency, score, game changers, extra turns, mass land denial, 2-card combos, "
+                "and mana screw/flood odds. Use when the user asks how strong a deck is, what "
+                "bracket it belongs in, or about game changers/combos. Takes several seconds "
+                "the first time a decklist is scored."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "deck_id": {
+                        "type": "integer",
+                        "description": "ID of the deck to score.",
+                    },
+                    "include_card_impacts": {
+                        "type": "boolean",
+                        "description": (
+                            "Also return per-card impact and playability scores. "
+                            "Only needed when the user asks which cards are strongest or weakest."
+                        ),
                     },
                 },
                 "required": ["deck_id"],
@@ -378,6 +411,22 @@ def _execute_tool(tool_call: ToolCall, db: Session) -> Any:
             db=db,
         )
 
+    if name == "get_power_level":
+        deck_id = args.get("deck_id")
+        deck = db.get(Deck, deck_id)
+        if deck is None:
+            return {"error": f"Deck {deck_id} not found."}
+        rows = get_deck_card_rows(db, deck_id)
+        result = score_power_level(diagnosis={}, rows=rows)
+        # Keep the LLM context small: drop bookkeeping fields and, unless
+        # asked for, the 100-row per-card table.
+        for key in ("url", "fetched_at", "cached"):
+            result.pop(key, None)
+        result.get("bracket_details", {}).pop("details_text", None)
+        if not args.get("include_card_impacts"):
+            result.pop("cards", None)
+        return {"deck": serialize_deck(deck), **result}
+
     return {"error": f"Unknown tool: {name}"}
 
 
@@ -388,6 +437,7 @@ def run_tools_node(state: GeneralChatState) -> dict[str, Any]:
     messages = list(state.get("messages", []))
 
     for tool_call in pending:
+        log_tool_used(tool_call.name, tool_call.arguments)
         try:
             result = _execute_tool(tool_call, db)
             ok = True

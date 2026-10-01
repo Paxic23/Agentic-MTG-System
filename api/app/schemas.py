@@ -8,6 +8,11 @@ class SemanticSearchRequest(BaseModel):
     limit: int = 10
     color: str | None = None
     max_mana_value: float | None = None
+    # Card types such as "Creature", "Land", "Sorcery". A card matches
+    # include_types if it has ANY of them; it is dropped if it has any
+    # exclude_types (so excluding "Creature" also drops artifact creatures).
+    include_types: list[str] = Field(default_factory=list)
+    exclude_types: list[str] = Field(default_factory=list)
 
 
 class CreateDeckRequest(BaseModel):
@@ -31,6 +36,8 @@ class DeckSuggestionRequest(BaseModel):
 class ImportDecklistRequest(BaseModel):
     decklist: str
     replace_existing: bool = False
+    # Moxfield exports list the commander first. Only applies to Commander decks.
+    assign_first_card_as_commander: bool = False
 
 
 class DeckCoachRequest(BaseModel):

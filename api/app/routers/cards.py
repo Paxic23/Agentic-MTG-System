@@ -64,6 +64,8 @@ def semantic_search(
     qdrant_results = semantic_search_cards(
         query=request.query,
         limit=candidate_limit,
+        include_types=request.include_types,
+        exclude_types=request.exclude_types,
     )
 
     card_ids = [int(point.id) for point in qdrant_results]

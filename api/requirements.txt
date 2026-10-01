@@ -9,3 +9,4 @@ qdrant-client
 sentence-transformers
 langgraph
 openai
+playwright

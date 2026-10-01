@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# Headless Chromium + its system libraries, used by edh_powerlevel_service.
+RUN playwright install --with-deps chromium
 
 COPY app ./app
 

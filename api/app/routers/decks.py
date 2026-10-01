@@ -20,6 +20,7 @@ from app.services.deck_service import (
     get_deck_or_404,
     is_probably_moxfield_decklist,
     parse_decklist_line,
+    resolve_card_name_via_scryfall,
     serialize_card,
     serialize_deck,
     suggest_cards_for_deck,
@@ -182,9 +183,9 @@ def import_decklist(
     imported = []
     unmatched = []
     skipped = []
-    should_assign_moxfield_commander = (
-        (deck.format or "").lower() == "commander"
-        and is_probably_moxfield_decklist(request.decklist)
+    should_assign_moxfield_commander = (deck.format or "").lower() == "commander" and (
+        request.assign_first_card_as_commander
+        or is_probably_moxfield_decklist(request.decklist)
     )
     commander_candidate_card_id: int | None = None
     first_parsed_seen = False
@@ -199,6 +200,15 @@ def import_decklist(
         quantity, card_name = parsed
 
         card = find_card_for_import(db, card_name)
+        resolved_name = None
+
+        if not card:
+            # Unknown locally: may be a flavor/alternate printed name
+            # (e.g. Universes Beyond) or a typo. Ask Scryfall for the
+            # Oracle name and retry.
+            resolved_name = resolve_card_name_via_scryfall(card_name)
+            if resolved_name:
+                card = find_card_for_import(db, resolved_name)
 
         if not first_parsed_seen:
             first_parsed_seen = True
@@ -222,12 +232,13 @@ def import_decklist(
             quantity=quantity,
         )
 
-        imported.append(
-            {
-                "quantity": quantity,
-                "card": serialize_card(card),
-            }
-        )
+        imported_entry = {
+            "quantity": quantity,
+            "card": serialize_card(card),
+        }
+        if resolved_name:
+            imported_entry["resolved_from"] = card_name
+        imported.append(imported_entry)
 
     if should_assign_moxfield_commander and commander_candidate_card_id is not None:
         # Session uses autoflush=False, so flush imported rows before selecting.
@@ -256,6 +267,7 @@ def import_decklist(
     return {
         "deck_id": deck_id,
         "imported_count": len(imported),
+        "resolved_count": sum(1 for entry in imported if "resolved_from" in entry),
         "unmatched_count": len(unmatched),
         "skipped_count": len(skipped),
         "imported": imported,

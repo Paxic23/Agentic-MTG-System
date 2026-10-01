@@ -1,12 +1,15 @@
 import re
+import time
 from collections import Counter, defaultdict
 from decimal import Decimal
 from typing import Any
 
+import httpx
 from fastapi import HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import Card, Deck, DeckCard
 from app.schemas import DeckSuggestionRequest
 from app.vector import ensure_collection, semantic_search_cards
@@ -479,6 +482,62 @@ def find_card_for_import(db: Session, raw_name: str) -> Card | None:
             return card
 
     return None
+
+
+# Scryfall asks clients to keep requests 50-100 ms apart.
+_SCRYFALL_MIN_INTERVAL_SECONDS = 0.1
+_scryfall_last_request_at = 0.0
+_scryfall_name_cache: dict[str, str | None] = {}
+
+
+def _scryfall_named_lookup(client: httpx.Client, mode: str, name: str) -> str | None:
+    global _scryfall_last_request_at
+
+    wait = _SCRYFALL_MIN_INTERVAL_SECONDS - (time.monotonic() - _scryfall_last_request_at)
+    if wait > 0:
+        time.sleep(wait)
+    _scryfall_last_request_at = time.monotonic()
+
+    response = client.get("https://api.scryfall.com/cards/named", params={mode: name})
+    if response.status_code != 200:
+        return None
+    return response.json().get("name")
+
+
+def resolve_card_name_via_scryfall(raw_name: str) -> str | None:
+    """Map a name our card database doesn't know to its Oracle name via Scryfall.
+
+    Catches alternate printed names, e.g. Universes Beyond / Secret Lair flavor
+    names ("Golbez, Clad in Darkness" -> "Syr Konrad, the Grim"), and minor
+    typos via Scryfall's fuzzy matching. Returns None when Scryfall can't
+    resolve it or is unreachable.
+    """
+    name = _normalize_import_name(raw_name)
+    if not name:
+        return None
+
+    cache_key = name.lower()
+    if cache_key in _scryfall_name_cache:
+        return _scryfall_name_cache[cache_key]
+
+    settings = get_settings()
+    headers = {
+        "User-Agent": settings.scryfall_user_agent,
+        "Accept": settings.scryfall_accept,
+    }
+
+    resolved: str | None = None
+    try:
+        with httpx.Client(timeout=10, headers=headers) as client:
+            resolved = _scryfall_named_lookup(client, "exact", name) or _scryfall_named_lookup(
+                client, "fuzzy", name
+            )
+    except httpx.HTTPError:
+        # Don't cache network failures; a later import may succeed.
+        return None
+
+    _scryfall_name_cache[cache_key] = resolved
+    return resolved
 
 
 def add_or_increment_deck_card(
@@ -961,6 +1020,7 @@ def build_deck_coach_report(
     suggestions_response: dict | None,
     user_goal: str | None,
     ignored_categories: list[str] | None = None,
+    power_score: dict | None = None,
 ) -> str:
     summary = diagnosis.get("summary", {})
     themes = diagnosis.get("themes", [])
@@ -998,6 +1058,42 @@ def build_deck_coach_report(
     lines.append(f"- Nonlands: {summary.get('nonland_cards', 0)}")
     lines.append(f"- Average mana value: {summary.get('average_mana_value') or '-'}")
     lines.append("")
+
+    if power_score:
+        lines.append("## Power Level")
+        if power_score.get("status") == "ok":
+            bracket_details = power_score.get("bracket_details", {})
+            requirements = bracket_details.get("requirements", {})
+            mana = power_score.get("mana", {})
+            lines.append(f"- Power level: {power_score.get('power_level')} / 10")
+            lines.append(
+                f"- Bracket: {power_score.get('bracket')} "
+                f"(minimum {bracket_details.get('minimum')}, recommended {bracket_details.get('recommended')})"
+            )
+            lines.append(f"- Tipping point: {power_score.get('tipping_point')}")
+            lines.append(f"- Efficiency: {power_score.get('efficiency')} / 10")
+            lines.append(f"- Score: {power_score.get('score')} / 1000")
+            for key, label in (
+                ("game_changers", "Game changers"),
+                ("extra_turns", "Extra turns"),
+                ("mass_land_denial", "Mass land denial"),
+                ("early_two_card_combos", "Early 2-card combos"),
+                ("late_two_card_combos", "Late 2-card combos"),
+            ):
+                requirement = requirements.get(key) or {}
+                if requirement.get("count"):
+                    cards = ", ".join(requirement.get("cards", []))
+                    lines.append(f"- {label} ({requirement['count']}): {cards}")
+            lines.append(
+                f"- Opening land odds: {mana.get('screw_pct')}% screw, "
+                f"{mana.get('sweet_spot_pct')}% sweet spot, {mana.get('flood_pct')}% flood"
+            )
+            if power_score.get("scan_warning"):
+                lines.append(f"- Site warning: {power_score['scan_warning']}")
+            lines.append("- Source: edhpowerlevel.com")
+        else:
+            lines.append(f"- {power_score.get('message', 'Power level unavailable.')}")
+        lines.append("")
 
     if themes:
         lines.append("## Detected themes")

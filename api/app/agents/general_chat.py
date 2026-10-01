@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agents.graphs.general_chat_graph import general_chat_graph
+from app.agents.tool_log import log_agent_called
 from app.schemas import GeneralChatRequest
 
 
@@ -13,6 +14,7 @@ class GeneralChatAgent:
         request: GeneralChatRequest,
         db: Session,
     ) -> dict[str, Any]:
+        log_agent_called("general_chat")
         state = general_chat_graph.invoke(
             {
                 "request": request,

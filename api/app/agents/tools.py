@@ -2,6 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.agents.tool_log import log_tool_used
 from app.core.config import get_settings
 from app.llm.factory import get_llm_client
 from app.llm.prompts.deck_coach import build_deck_coach_prompts
@@ -14,20 +15,24 @@ from app.services.deck_service import (
     diagnose_deck_data,
     suggest_cards_for_deck,
 )
+from app.services.power_score_service import score_power_level
 
 
 DeckRows = list[tuple[DeckCard, Card]]
 
 
 def run_analysis_tool(deck: Deck, rows: DeckRows) -> dict[str, Any]:
+    log_tool_used("run_analysis_tool")
     return analyze_deck_data(deck=deck, rows=rows)
 
 
 def run_rules_check_tool(deck: Deck, rows: DeckRows) -> dict[str, Any]:
+    log_tool_used("run_rules_check_tool")
     return check_deck_rules_data(deck=deck, rows=rows)
 
 
 def run_diagnosis_tool(deck: Deck, rows: DeckRows) -> dict[str, Any]:
+    log_tool_used("run_diagnosis_tool")
     return diagnose_deck_data(deck=deck, rows=rows)
 
 
@@ -48,6 +53,7 @@ def run_suggestion_tool(
     limit: int,
     max_mana_value: float | None,
 ) -> dict[str, Any]:
+    log_tool_used("run_suggestion_tool")
     request = DeckSuggestionRequest(
         goal=goal,
         limit=limit,
@@ -63,6 +69,11 @@ def run_suggestion_tool(
     )
 
 
+def run_power_level_tool(diagnosis: dict[str, Any], rows: DeckRows) -> dict[str, Any]:
+    log_tool_used("run_power_level_tool")
+    return score_power_level(diagnosis=diagnosis, rows=rows)
+
+
 def run_report_tool(
     *,
     deck: Deck,
@@ -72,7 +83,9 @@ def run_report_tool(
     suggestions_response: dict[str, Any],
     user_goal: str | None,
     ignored_categories: list[str],
+    power_score: dict[str, Any] | None = None,
 ) -> str:
+    log_tool_used("run_report_tool")
     return build_deck_coach_report(
         deck=deck,
         analysis=analysis,
@@ -81,6 +94,7 @@ def run_report_tool(
         suggestions_response=suggestions_response,
         user_goal=user_goal,
         ignored_categories=ignored_categories,
+        power_score=power_score,
     )
 
 
@@ -101,6 +115,7 @@ def run_llm_report_enhancement_tool(
     deterministic report instead of breaking the deck-coach route.
     """
 
+    log_tool_used("run_llm_report_enhancement_tool")
     settings = get_settings()
     if not settings.llm_enable_deck_coach:
         return {

@@ -65,11 +65,15 @@ export type DeckCoachResponse = {
 export type DeckImportResult = {
   deck_id: number;
   imported_count: number;
+  resolved_count: number;
   unmatched_count: number;
   skipped_count: number;
   imported: {
     quantity: number;
     card: Card;
+    // Original decklist name when it was resolved to a different card name
+    // via Scryfall (e.g. a Universes Beyond flavor name).
+    resolved_from?: string;
   }[];
   unmatched: {
     line: string;

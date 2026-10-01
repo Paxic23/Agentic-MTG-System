@@ -188,6 +188,16 @@ export function BuilderPage({ lab }: BuilderPageProps) {
                 <strong>{lab.importResult.unmatched_count}</strong>.
               </p>
 
+              {lab.importResult.imported.some((item) => item.resolved_from) && (
+                <p>
+                  Matched by alternate name:{" "}
+                  {lab.importResult.imported
+                    .filter((item) => item.resolved_from)
+                    .map((item) => `${item.resolved_from} → ${item.card.name}`)
+                    .join(", ")}
+                </p>
+              )}
+
               {lab.importResult.unmatched.length > 0 && (
                 <div className="unmatched-list">
                   {lab.importResult.unmatched.map((item, index) => (

@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agents.graphs.deck_coach_graph import deck_coach_graph
+from app.agents.tool_log import log_agent_called
 from app.schemas import DeckCoachRequest
 
 
@@ -20,6 +21,7 @@ class DeckCoachAgent:
         request: DeckCoachRequest,
         db: Session,
     ) -> dict[str, Any]:
+        log_agent_called("deck_coach")
         result = deck_coach_graph.invoke(
             {
                 "request": request,

@@ -19,10 +19,10 @@ def build_deck_coach_prompts(
     deterministic_report: str,
 ) -> tuple[str, str]:
     system_prompt = (
-        "You are an expert Magic: The Gathering deck coach. "
-        "Give practical, format-aware advice in a natural, flexible tone. "
+        "You are an expert on Magic: The Gathering. "
+        "Give practical advice for Commander. "
         "Never invent card data not present in the supplied tool outputs. "
-        "Prefer clear reasoning, realistic caveats, and concrete next steps. "
+        #"Prefer clear reasoning, realistic caveats, and concrete next steps. "
         "Do not overstate deck themes: if diagnosis.theme_profile marks a role as minor, "
         "treat it as incidental support, not as a central deck identity."
     )
@@ -31,21 +31,20 @@ def build_deck_coach_prompts(
 Create a fresh coaching response for this deck.
 
 Deck name: {deck_name}
-Format: {deck_format or "unknown"}
+Format: {deck_format or "Commander"}
 Goal used: {goal_used or "none"}
 Ignored categories: {", ".join(ignored_categories) if ignored_categories else "none"}
 
 Rules:
-- If there are legality or rules issues, surface them early.
-- Use diagnosis.theme_profile when discussing themes.
-- Only describe core/supporting roles as real deck themes.
-- Minor themes can be mentioned only as small incidental packages, not as deck identity.
-- The response can use headings and lists if useful, but do not force a rigid template.
-- Keep the response concise but substantive.
-- Do not repeatedly push categories listed in "Ignored categories" unless they are direct hard legality issues.
-- Use only the suggested cards supplied in the tool output.
-- Do not claim prices or current market info unless explicitly provided.
-- If no explicit goal is provided, do an open-ended deck improvement pass.
+- If there are legality or rules issues, surface them early
+- Use diagnosis.theme_profile when discussing themes
+- Minor themes can be mentioned only as small incidental packages, not as deck identity
+- The response can use headings and lists if useful, but do not force a rigid template
+- Keep the response concise but substantive
+- Do not repeatedly push categories listed in "Ignored categories" unless they are direct hard legality issues
+- Use only the suggested cards supplied in the tool output
+- Do not claim prices or current market info unless explicitly provided
+- If no explicit goal is provided, do an open-ended deck improvement pass
 
 Analysis tool output:
 {_compact_json(analysis)}
@@ -59,8 +58,9 @@ Diagnosis tool output:
 Suggestions tool output:
 {_compact_json(suggestions_response)}
 
-Deterministic baseline report (optional context, do not feel forced to mirror its structure):
-{deterministic_report}
 """.strip()
 
     return system_prompt, user_prompt
+
+#- Only describe core/supporting roles as real deck themes.
+#Deterministic baseline report (optional context, do not feel forced to mirror its structure): {deterministic_report}

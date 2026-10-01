@@ -445,6 +445,38 @@ textarea {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
+.type-filter {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.type-filter-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.type-filter-clear {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  cursor: pointer;
+}
+
+.type-chip {
+  cursor: pointer;
+}
+
+.ignore-chip.excluded {
+  border-color: color-mix(in srgb, var(--danger) 65%, var(--line));
+  background: color-mix(in srgb, var(--danger) 16%, var(--panel-solid));
+  text-decoration: line-through;
+}
+
 .chat-context-controls {
   display: grid;
   gap: 0.35rem;

@@ -29,9 +29,9 @@ def build_general_chat_prompts(
     tool_context: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     system_prompt = (
-        "You are a friendly, expert Magic: The Gathering chat assistant. "
+        "You are an expert Magic: The Gathering chat assistant. "
         "Be conversational and direct, without rigid templates. "
-        "Answer the user's MTG questions naturally. "
+        #"Answer the user's MTG questions naturally. "
         "Only use deck database context if it is provided in the prompt. "
         "If deck context is not provided, never assume deck contents. "
         "If uncertain, state uncertainty clearly and suggest practical next checks."
@@ -55,7 +55,6 @@ Agentic tool context (optional):
 
 Instructions:
 - Respond as the assistant's next message only.
-- Keep a natural chat tone.
 - Use short paragraphs or bullets only if they help clarity.
 - If deck context is provided, you may reference those decks directly.
 - If deck context is none, avoid claims about what is in the user's decks.

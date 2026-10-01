@@ -2,7 +2,14 @@ import os
 from functools import lru_cache
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchText,
+    PointStruct,
+    VectorParams,
+)
 from sentence_transformers import SentenceTransformer
 
 from app.models import Card
@@ -98,13 +105,61 @@ def upsert_cards(cards: list[Card]) -> None:
         )
 
 
-def semantic_search_cards(query: str, limit: int = 10):
+CARD_TYPES = (
+    "Artifact",
+    "Battle",
+    "Creature",
+    "Enchantment",
+    "Instant",
+    "Land",
+    "Planeswalker",
+    "Sorcery",
+)
+
+
+def normalize_card_types(types: list[str] | None) -> list[str]:
+    """Title-case and keep only known card types, so bad input can't widen a filter."""
+    known = {card_type.lower(): card_type for card_type in CARD_TYPES}
+    return [known[t.strip().lower()] for t in types or [] if t.strip().lower() in known]
+
+
+def _type_line_contains(card_type: str) -> FieldCondition:
+    # Without a full-text index, MatchText is a plain substring match on the
+    # stored type_line, e.g. "Creature" matches "Artifact Creature — Golem".
+    return FieldCondition(key="type_line", match=MatchText(text=card_type))
+
+
+def build_card_type_filter(
+    include_types: list[str] | None = None,
+    exclude_types: list[str] | None = None,
+) -> Filter | None:
+    include = normalize_card_types(include_types)
+    exclude = normalize_card_types(exclude_types)
+
+    if not include and not exclude:
+        return None
+
+    return Filter(
+        must=[Filter(should=[_type_line_contains(t) for t in include])] if include else None,
+        must_not=[_type_line_contains(t) for t in exclude] or None,
+    )
+
+
+def semantic_search_cards(
+    query: str,
+    limit: int = 10,
+    include_types: list[str] | None = None,
+    exclude_types: list[str] | None = None,
+):
     client = get_qdrant_client()
     query_vector = embed_text(query)
 
+    # Type filtering runs inside Qdrant (not afterwards in SQL) so excluding a
+    # common type doesn't leave the top-N candidate pool nearly empty.
     result = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
+        query_filter=build_card_type_filter(include_types, exclude_types),
         limit=limit,
         with_payload=True,
     )

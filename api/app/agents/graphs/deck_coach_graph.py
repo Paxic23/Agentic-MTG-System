@@ -8,6 +8,7 @@ from app.agents.tools import (
     run_analysis_tool,
     run_diagnosis_tool,
     run_llm_report_enhancement_tool,
+    run_power_level_tool,
     run_report_tool,
     run_rules_check_tool,
     run_suggestion_tool,
@@ -34,6 +35,7 @@ class DeckCoachState(TypedDict, total=False):
     goal_used: str | None
     ignored_categories: list[str]
     suggestions_response: dict[str, Any]
+    power_score: dict[str, Any]
     coach_report: str
     llm: dict[str, Any]
     final_response: dict[str, Any]
@@ -108,6 +110,12 @@ def diagnose_deck_node(state: DeckCoachState) -> dict[str, Any]:
     }
 
 
+def score_power_level_node(state: DeckCoachState) -> dict[str, Any]:
+    return {
+        "power_score": run_power_level_tool(diagnosis=state["diagnosis"], rows=state["rows"])
+    }
+
+
 def choose_goal_node(state: DeckCoachState) -> dict[str, Any]:
     request = state["request"]
     ignored_categories = [
@@ -149,6 +157,7 @@ def build_report_node(state: DeckCoachState) -> dict[str, Any]:
             suggestions_response=state["suggestions_response"],
             user_goal=request.goal,
             ignored_categories=state.get("ignored_categories", []),
+            power_score=state.get("power_score"),
         )
     }
 
@@ -186,6 +195,7 @@ def build_response_node(state: DeckCoachState) -> dict[str, Any]:
             "rules_check": state["rules_check"],
             "diagnosis": state["diagnosis"],
             "suggestions": state["suggestions_response"],
+            "power_score": state.get("power_score", {}),
             "llm": state.get("llm", {}),
         }
 
@@ -200,6 +210,7 @@ def build_deck_coach_graph():
     graph.add_node("analyze_deck", analyze_deck_node)
     graph.add_node("check_rules", check_rules_node)
     graph.add_node("diagnose_deck", diagnose_deck_node)
+    graph.add_node("score_power_level", score_power_level_node)
     graph.add_node("choose_goal", choose_goal_node)
     graph.add_node("suggest_cards", suggest_cards_node)
     graph.add_node("build_report", build_report_node)
@@ -218,7 +229,8 @@ def build_deck_coach_graph():
     graph.add_edge("empty_deck_response", END)
     graph.add_edge("analyze_deck", "check_rules")
     graph.add_edge("check_rules", "diagnose_deck")
-    graph.add_edge("diagnose_deck", "choose_goal")
+    graph.add_edge("diagnose_deck", "score_power_level")
+    graph.add_edge("score_power_level", "choose_goal")
     graph.add_edge("choose_goal", "suggest_cards")
     graph.add_edge("suggest_cards", "build_report")
     graph.add_edge("build_report", "enhance_report_with_llm")

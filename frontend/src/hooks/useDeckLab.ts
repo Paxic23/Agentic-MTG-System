@@ -30,6 +30,19 @@ import type {
 
 export type SearchMode = "exact" | "semantic";
 
+export const CARD_TYPES = [
+  "Creature",
+  "Land",
+  "Instant",
+  "Sorcery",
+  "Artifact",
+  "Enchantment",
+  "Planeswalker",
+  "Battle",
+] as const;
+
+export type TypeFilterState = "include" | "exclude";
+
 export function useDeckLab() {
   const [mode, setMode] = useState<SearchMode>("exact");
 
@@ -38,6 +51,22 @@ export function useDeckLab() {
   const [color, setColor] = useState("");
   const [maxManaValue, setMaxManaValue] = useState("");
   const [semanticQuery, setSemanticQuery] = useState("");
+  const [typeFilters, setTypeFilters] = useState<Record<string, TypeFilterState>>({});
+
+  // Cycles a card type: any -> include -> exclude -> any.
+  function cycleTypeFilter(cardType: string) {
+    setTypeFilters((current) => {
+      const next = { ...current };
+      if (!current[cardType]) {
+        next[cardType] = "include";
+      } else if (current[cardType] === "include") {
+        next[cardType] = "exclude";
+      } else {
+        delete next[cardType];
+      }
+      return next;
+    });
+  }
 
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(false);
@@ -213,6 +242,8 @@ export function useDeckLab() {
         color,
         maxManaValue,
         limit: 25,
+        includeTypes: Object.keys(typeFilters).filter((t) => typeFilters[t] === "include"),
+        excludeTypes: Object.keys(typeFilters).filter((t) => typeFilters[t] === "exclude"),
       });
 
       setCards(data);
@@ -409,6 +440,7 @@ export function useDeckLab() {
         deckId: newDeckId,
         decklist: importDecklistText,
         replaceExisting: replaceExistingImport,
+        assignFirstCardAsCommander: true,
       });
 
       setImportResult(data);
@@ -503,6 +535,9 @@ export function useDeckLab() {
       setMaxManaValue,
       semanticQuery,
       setSemanticQuery,
+      typeFilters,
+      cycleTypeFilter,
+      setTypeFilters,
       cards,
       loading,
       error,
@@ -567,6 +602,7 @@ export function useDeckLab() {
       color,
       maxManaValue,
       semanticQuery,
+      typeFilters,
       cards,
       loading,
       error,
